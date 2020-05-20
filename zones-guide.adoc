@@ -1,0 +1,3058 @@
+:toc: left
+:source-highlighter: pygments
+:doctype: book
+:numbered:
+:idprefix:
+:docinfo:
+:data-uri:
+:icons: font
+
+:uri-sshkeys: https://internal.eait.uq.edu.au/accounts/sshkeys.ephp
+:uri-studentkeys: https://student.eait.uq.edu.au/accounts/sshkeys.ephp
+:uri-winscp: https://winscp.net/eng/download.php
+:uri-filezilla: https://filezilla-project.org/download.php?platform=win64
+:uri-uqvpn: https://my.uq.edu.au/information-and-services/information-technology/working-remotely/vpn-virtual-private-network
+:uri-eaitvpn: https://help.eait.uq.edu.au/remote/vpn/
+:uri-winscp-tunnel: https://winscp.net/eng/docs/ui_login_tunnel
+:uri-nginx-map: http://nginx.org/en/docs/http/ngx_http_map_module.html
+:uri-laravel: https://laravel.com
+:uri-pdo: https://www.php.net/manual/en/book.pdo.php
+:uri-drupal: https://www.drupal.org/
+:uri-drupal-nginx: https://www.nginx.com/resources/wiki/start/topics/recipes/drupal/
+:uri-man-chmod: https://illumos.org/man/1/chmod
+:uri-django: https://www.djangoproject.com/
+:uri-flask: https://github.com/pallets/flask
+:uri-flask-docs: https://flask.palletsprojects.com/en/1.1.x/
+:uri-express: https://expressjs.com
+:uri-mongo-js: https://mongodb.github.io/node-mongodb-native/3.5/
+:uri-node-http: https://nodejs.org/docs/latest-v11.x/api/http.html
+:uri-yaml: https://yaml.org/
+
+= UQcloud zones guide
+:author: Alex Wilson (EAIT ITIG)
+:email: helpdesk@eait.uq.edu.au
+
+== Introduction
+
+This guide is intended to give both a general overview of and specific advice on
+using zones on `uqcloud.net`.
+
+For most of this guide to make sense, you will need some basic familiarity with
+a UNIX/Linux commandline environment and tools such as SSH or SFTP.
+
+More advanced topics will likely require some familiarity with computer
+networking topics (such as TCP/IP) and web application and database design.
+
+=== What is a zone? Why would I want one?
+
+Zones are a specific kind of virtualisation technology. Virtualisation is the
+process of making one computer "pretend" to be multiple (usually smaller)
+computers -- in the case of UQcloud, we do this in order to allow large servers
+to be broken up into small units for hosting websites and applications which
+do not need all of the available capacity on a large server.
+
+A zone functions as though it was a small computer controlled completely by
+you (you get "root" access), which you can use to run programs or store data.
+It has a permanent network connection, protected power circuits with battery
+and generator backup, and redundancy to guard against disk failure and other
+problems.
+
+It is very similar in concept to a Virtual Private Server (VPS), cloud instance,
+or Virtual Machine (VM) hosted by a commercial hosting provider like Amazon AWS.
+
+Some typical uses of zones include:
+
+ * Hosting websites that don't fit within the official UQ Drupal environment
+   (e.g. for a coursework project, a conference, or even a student society);
+ * Running a web application with a database (e.g. a specialised marking tool
+   or an interactive system for teaching); or
+ * Developing and testing new programs or applications.
+
+The reason why we provide zones rather than true Virtual Machines for UQcloud
+is about cost -- the zones technology allows us to deploy many more applications
+per physical server than most other options on the market, which in turn allows
+us to offer them for use in situations where it would not make sense for the
+University to pay for commercial hosting.
+
+For example, we automatically allow all UQ students and staff to deploy one
+zone for any purpose associated with their job or course of study at the
+university. We also can support the use of zones for teaching, where one zone
+is created for every student in a course.
+
+Another key advantage of a zone is its position within the UQ network, which
+allows it to make easy use of facilities like UQ authentication or the
+ability to communicate with other internal devices and systems inside the
+University.
+
+== Logging in and installing tools
+
+Before we can create and manage zones, you will need to be logged into your
+account on the system and have the tools installed. This section outlines how
+to achieve this, as well as some basic guidance on navigating the tools
+themselves.
+
+Rather than usernames and passwords, the system which manages zones (named
+"Triton") uses SSH key pairs for authentication.
+
+An SSH key pair consists of two parts: a "public" key and a "private" key. The
+private key should be kept secret at all times and never shared (even with IT
+support or helpdesk) -- the Triton system does not need to know what it is.
+The public key, on the other hand, is safe to share, and is what you will need
+to give to the Triton system to let it identify you.
+
+=== Managing your SSH keys
+
+It's best for your security to store SSH private keys in one of two ways: either
+on disk, encrypted, protected with a strong passphrase; or on a hardware device
+like a Yubikey.
+
+On the staff and student general-purpose UNIX servers (`mango.eait.uq.edu.au`
+and `moss.labs.eait.uq.edu.au`), there's a command which will help you to
+use the first of those two recommended approaches, named `sdc-setup`.
+
+After logging into `mango` or `moss` with your UQ username and password, you
+can run `sdc-setup` like this:
+
+[source,shell-session]
+....
+uqfoobar@mango:~$ sdc-setup
+error: no SSH private key found in /home/users/uqfoobar/.ssh/id_rsa
+
+please check that /home/users/uqfoobar/.ssh/id_rsa exists and add the contents
+of /home/users/uqfoobar/.ssh/id_rsa.pub to your account at
+https://internal.eait.uq.edu.au/accounts/sshkeys.ephp
+
+if this is your first time using SDC, you should generate a key
+would you like to generate a new key now? [yN] y <1>
+
+Enter passphrase (empty for no passphrase): <2>
+Enter same passphrase again: <3>
+
+Your identification has been saved in /home/users/uqfoobar/.ssh/id_rsa.
+Your public key has been saved in /home/users/uqfoobar/.ssh/id_rsa.pub.
+The key fingerprint is:
+SHA256:hynWoXs2zUG+ZCaAcncV7gM2Ejnf/EddKv7kG/cvEJY uqfoobar@mango.eait.uq.edu.au
+The key's randomart image is:
++---[RSA 2048]----+
+|      ..  o.     |
+|     .o. o      .|
+|  . o +o*oo  . o.|
+|   o . B.Xo E o .|
+|      + S X+ +   |
+|     . o O ++ o  |
+|      . + +  *. .|
+|       o .    +o.|
+|              .o+|
++----[SHA256]-----+
+
+now visit this website:
+https://internal.eait.uq.edu.au/accounts/sshkeys.ephp <4>
+and add the following text as a new key:
+
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... <5>
+
+then run sdc-setup again
+....
+<1> Press `y`.
+<2> Make sure to enter a passphrase that is strong and as long as you think
+    you can comfortably remember.
+<3> Enter the passphrase again.
+<4> If you're a staff member, visit {uri-sshkeys}[this URL] in your web browser
+    and log in using your UQ username and password. Use
+    {uri-studentkeys}[this URL] instead if you're a student (
+    `moss.labs.eait.uq.edu.au` will produce different output here).
+<5> Then paste the line beginning with `ssh-rsa` into the "Add new key" dialog.
+
+If you already have an SSH key pair which you use for other systems, it's fine
+to re-use it for Triton. Just visit the {uri-sshkeys}[SSH key management tool]
+(same URL as above) in order to add your key.
+
+It's worth noting that in the SSH key management tool, after you have entered a
+key, you have to press the "Save changes" button. This sometimes trips people
+up.
+
+TIP: If you're a student or only have an EAIT labs account (e.g. because you're
+a course tutor), you might receive a *403 Forbidden* error visiting the regular
+(staff) SSH key management tool. You can use the {uri-studentkeys}[matching
+page under `student.eait.uq.edu.au`] instead. If both tools return errors,
+contact mailto:helpdesk@eait.uq.edu.au[Helpdesk].
+
+You can also return to the SSH key management tool at any time to remove keys
+or replace them with new ones (if, for example, you forget or lose one of
+your old keys).
+
+If you decide to generate your own keys, we strongly recommend that when using
+the `ssh-keygen` command, you should supply the `-o` option. This tells
+`ssh-keygen` to use a newer, stronger form of encryption which helps protect
+your keys.
+
+If you are interested in the second recommended option -- storing your SSH keys
+on a dedicated device like a Yubikey -- we recommend looking at
+https://github.com/arekinath/pivy[`pivy`], which works best on MacOS or Linux.
+
+=== Using "triton" on `mango` or `moss`
+
+On both `mango.eait.uq.edu.au` and `moss.labs.eait.uq.edu.au` you will find
+the `triton` command and other tools for working with zones pre-installed
+and ready to use.
+
+Once you have run `sdc-setup` and created your account you shouldn't need
+to re-run it each time you log in -- the key will be automatically found and
+set up for you at login.
+
+You can check that your account is working correctly with Triton by running
+the command `triton account get`:
+
+[source,shell-session]
+....
+uqfoobar@mango:~$ triton account get
+id: 783fcb12-cfb4-489e-ab1c-fb999661f7c5
+login: uqfoobar
+email: foo.bar@uq.edu.au
+companyName: EAIT
+firstName: Foo
+lastName: Bar
+triton_cns_enabled: true
+phone: 12345
+updated: 2019-09-25T03:11:34.682Z (18w)
+created: 2015-02-02T06:48:25.648Z (4y)
+....
+
+If you see an error like this instead:
+
+....
+triton account: error (Config): could not load "env" profile (missing TRITON_*, or SDC_*, environment variables)
+    No profile information could be loaded.
+    Use "triton profile create" to create a profile or provide
+    the required "CloudAPI options" described in "triton --help".
+    See https://github.com/joyent/node-triton#setup for more help.
+....
+
+This means that you don't have your SSH keys correctly configured. Check that
+they either exist on disk, or that you forwarded your SSH agent to use keys
+kept in a hardware device.
+
+You might also see this error:
+
+....
+triton account get: error (InvalidCredentials): Invalid authorization credentials supplied
+....
+
+This means that you have an SSH key correctly set up in your home directory
+or SSH agent, but it hasn't been saved correctly in the
+{uri-sshkeys}[SSH key management tool]. If you need to find the correct string
+to paste into the SSH key management tool for your key, you can look at the
+contents of the `.pub` file (e.g. `+~/.ssh/id_rsa.pub+`), or use `ssh-add -L`.
+
+=== Installing "triton" on your own machine
+
+You can also install the `triton` command directly on your machine if you wish,
+using the Node.js package manager `npm`.
+
+In order to be able to use some UQ-specific features, you will have to install
+our customised version, which is available on GitHub.
+
+To install it, use the command
+`npm install -g git+https://github.com/eait-itig/node-triton#eait`.
+
+On `mango` and `moss` we automatically set up environment variables for you
+based on your key. The documentation for the `triton` command should help you
+do this yourself as a Triton "profile" (or you can copy from
+`/etc/profile.d/sdc.sh` on `mango` or `moss`).
+
+The information you will need about our particular Triton installation is
+as follows:
+
+`SDC_URL`:: `https://cloudapi.gps-1.uqcloud.net`
+`SDC_ACCOUNT`:: `uqfoobar` (your UQ username)
+
+=== Getting around the `triton` commands
+
+The `triton` commandline tool includes a number of "subcommands" which perform
+different operations. For example, there is a subcommand `triton package list`
+which lists available "packages", and `triton image list` which lists "images"
+(you can find out more about these in the sections <<packages>> and
+<<images>>).
+
+The `triton` command supports the `--help` option to help remind you of the
+name of a subcommand, or simply to let you explore what's available.
+
+Using it at the top level will print out all of the different subcommand
+trees available, like this:
+
+[source,shell-session]
+....
+$ triton --help
+...
+Commands:
+    help (?)                  Help on a specific sub-command.
+    profile                   List, get, create and update Triton CLI profiles.
+    env                       Emit shell commands to setup environment.
+    completion                Emit bash completion. See help for installation.
+
+  Instances (aka VMs/Machines/Containers):
+    instance (inst)           List and manage Triton instances.
+    instances (insts, ls)     A shortcut for "triton instance list".
+    create                    A shortcut for "triton instance create".
+    delete (rm)               A shortcut for "triton instance delete".
+    start                     A shortcut for "triton instance start".
+    stop                      A shortcut for "triton instance stop".
+    ... etc
+
+  Images, Packages, Networks, Firewall Rules:
+    image (img)               List and manage Triton images.
+    package (pkg)             List and get Triton packages.
+    ... etc
+....
+
+Many subcommands have shortened versions of their name ("aliases"), such as
+`triton package`, which can be abbreviated as `triton pkg`. In the help output
+any abbreviations allowed are listed in parentheses after the name.
+
+You can also use `--help` with any subcommand, for example with `triton pkg`:
+
+[source,shell-session]
+....
+$ triton pkg --help
+List and get Triton packages.
+
+A package is a collection of attributes -- for example disk quota,
+amount of RAM -- used when creating an instance. They have a name
+and ID for identification.
+
+Usage:
+    triton package [OPTIONS] COMMAND [ARGS...]
+    triton package help COMMAND
+
+Options:
+    -h, --help          Show this help message and exit.
+
+Commands:
+    help (?)            Help on a specific sub-command.
+    list (ls)           List packages.
+    get                 Get a package.
+....
+
+== Creating and managing zones
+
+After getting the tools installed and your account set up, we can finally use
+them to create a zone.
+
+There are a couple of basic parameters we will need to decide on before we
+can create a new zone:
+
+ * A name for the zone (also called the "alias") -- this also determines the
+   DNS name for the zone (and thus the URL you use to access a website on it);
+ * The "package" we want to use -- this specifies the size of the zone, in terms
+   of what amount of resources are allocated to it. The package specifies the
+   memory or RAM limit for the zone ("memory cap"), the limit of disk space that
+   can be used ("quota"), as well as the maximum amount of CPU time the zone can
+   consume;
+ * The "image" we want to use -- this specifies what software will be installed
+   already in the zone when we first start it up, as well as the base operating
+   system to be used; and
+ * Which networks to connect the zone to -- so that we can access it, and so
+   that it can access other network resources it needs to run.
+
+Depending on the image we choose and the software that comes with it, there
+might also be additional parameters involved in zone creation, which are
+explained in the following sections.
+
+=== Choosing a package [[packages]]
+
+First, let's have a look at the available packages in our installation by
+running the command `triton pkg list`. It will output a table like this one:
+
+[source,shell-session]
+....
+$ triton pkg list
+SHORTID   NAME         MEMORY  SWAP  DISK  VCPUS
+fbcd1fb1  s1-standard    512M    4G    8G      -
+30576ce1  s1-large         1G    8G   16G      -
+703756ac  s1-xlarge        2G   16G   32G      -
+9a1bc31b  s1-2xlarge       4G   32G   64G      -
+18788a7b  z1-small       384M    1G   10G      -
+4d9c02a1  z1-standard    512M    1G   10G      -
+fa587e7c  z1-large         1G    4G   20G      -
+51ebcce0  z1-xlarge        2G    8G   40G      -
+ffbc80c9  z1-2xlarge       4G   16G   80G      -
+6c316255  z1-3xlarge       8G   16G  200G      -
+109554f9  z1-4xlarge      16G   32G  350G      -
+....
+
+Packages are generally referred to by their name (in the second column). If
+you're not sure what package to pick, it's usually best to start with
+`z1-standard`.
+
+TIP: You can always resize a zone later to a different package if you choose
+the wrong one. Resizing a zone is quick and doesn't require the zone to be
+restarted.
+
+The packages on UQcloud are organised into a few groups based on the letter
+and number they start with (before the hyphen). Here we can see packages from
+the "S1" and "Z1" groups.
+
+Most of the time, we will want to use packages from the "Z1" group. These are
+standard packages appropriate for most everyday use.
+
+The other groups are intended for particular kinds of workloads, or for use
+with special types of images. They are as follows:
+
+Z1:: General-purpose zone package, good for most uses.
+S1:: High-swap package, intended for applications which allocate a lot of
+     memory but then don't actually use it all (e.g. MongoDB or some other
+     specialised software)
+B1:: Bhyve hardware virtualisation package, can only be used with a matching
+     Bhyve image.
+
+==== Package CPU limits
+
+You might have noticed that the table above did not include one of the resources
+we talked about when defining what a "package" was: CPU time limits. This is a
+complex topic which you can skip over if you aren't interested in it.
+
+The following table summarises the CPU time limits for the Z1 group packages:
+
+[options="header"]
+|===
+| Package name   | Guaranteed CPU | CPU cap | Burst ratio
+| `z1-small`     |   2%           |  80%    | 32x
+| `z1-standard`  |   3%           | 100%    | 30x
+| `z1-large`     |   6%           | 150%    | 23x
+| `z1-xlarge`    |  13%           | 250%    | 19x
+| `z1-2xlarge`   |  26%           | 400%    | 15x
+| `z1-3xlarge`   |  52%           | 650%    | 12x
+| `z1-4xlarge`   | 104%           | 800%    | 8x
+|===
+
+Percentages in the table are all phrased as percentage of a single logical CPU
+("core").
+
+The column "CPU cap" describes the maximum amount of CPU time that
+a zone with that package is allowed to consume at any instant. The column
+"guaranteed CPU" describes the average amount of CPU time which a zone can
+rely on being able to consume, even in the worst case where the physical
+server is full of zones to its maximum capacity and they are all trying to use
+the most CPU time they can all at once. The column "Burst ratio" is the ratio
+between those two quantities.
+
+As you can see, the UQcloud zones are not designed for workloads which spend
+all of their time consuming the maximum amount of CPU power they possibly can
+(e.g. scientific compute processing jobs). If every zone in UQcloud tries
+to use its maximum CPU power all the time and the systems are operating near
+capacity, the vast majority of zones will run very slowly indeed.
+
+Most website workloads are not heavy on CPU power, and when they are it tends
+to be periodic and bursty in nature (a short time of heavy processing
+interspersed with idleness). The packages are set up to take advantage of
+this fact.
+
+=== Choosing an image [[images]]
+
+Next, we'll have a look at the available images which you can choose from.
+Similarly to packages, we can list the available images by running
+`triton image list`.
+
+Unlike packages, there are a lot of different images available to choose from.
+The table below is truncated to show just a few of each major type.
+
+....
+SHORTID   NAME                   VERSION   FLAGS  OS       TYPE          PUBDATE
+221635c4  base-64                18.1.0    P      smartos  zone-dataset  2018-04-08
+5a513a46  base-multiarch         18.1.0    P      smartos  zone-dataset  2018-04-08
+c193a558  base-64-lts            18.4.0    P      smartos  zone-dataset  2019-01-21
+
+19aa3328  alpine-3               20170303  P      linux    lx-dataset    2017-03-03
+7b5981c4  ubuntu-16.04           20170403  P      linux    lx-dataset    2017-04-03
+3dbbdcca  centos-7               20180323  P      linux    lx-dataset    2018-03-23
+63d6e664  debian-9               20180404  P      linux    lx-dataset    2018-04-04
+1246aee0  ubuntu-18.04           20191115  P      linux    lx-dataset    2019-11-15
+
+7858da72  ubuntu-krb5            1.0.4     IP     linux    lx-dataset    2020-01-16
+c83d1030  webproject             3.0.4     IP     linux    lx-dataset    2020-01-21
+da39262c  jupyter                1.0.3     IP     linux    lx-dataset    2020-02-11
+91cca3be  x2go-xfce4             1.0.1     IP     linux    lx-dataset    2020-02-20
+....
+
+The list is also broken up into sections so we can talk about each one.
+
+First, observe the "OS" column in the table -- this indicates which operating
+system the image is based upon. Usually you will only see `linux` and `smartos`
+here.
+
+It's generally recommended for most users to stick to the `linux` images, but
+if you're interested in the "native" `smartos` type, you can find more
+information in the section <<pkgsrc>>.
+
+The Linux images listed above are broken into two groups: the first group are
+*base OS images*, which don't contain any customisations specifically for
+UQcloud and don't contain any pre-installed software beyond the basic Linux
+environment.
+
+The second group are *UQcloud customised images* with some software
+pre-installed and configured.
+
+For new users, or those who are less experienced with administering Linux
+server systems themselves, it's recommended to stick with the customised images
+which are already set up.
+
+For example, in the listing above the `jupyter` image comes with the Jupyter
+Python scientific notebook software already pre-installed along with a number
+of Python scientific packages. You can create a `jupyter` image zone and then
+log in and use Jupyter straight away without any additional work.
+
+For advanced users who want to set up the system themselves from scratch, the
+*base OS images* or the `ubuntu-krb5` image are recommended. The `ubuntu-krb5`
+image has only one additional piece of software installed compared to the base
+`ubuntu-18.04` image: a plugin to allow UQ usernames and passwords to log in
+over SSH.
+
+For users in the middle, and especially those developing web applications, the
+`webproject` image is the best bet. It has a large amount of web application
+frameworks, languages and databases pre-installed and partially configured,
+designed to make it easy to add your code and get it running. The sections of
+this guide named <<webproject>> and <<webproject-frameworks>> are specifically
+about how to get the best out of this image.
+
+TIP: Zones can't have their image changed after they have been created. If you
+     discover that you have used the wrong image for a zone, you will need to
+     destroy it and create a new one.
+
+=== Choosing which networks to use
+
+Continuing the theme from packages and images, you can see a list of the
+available networks by running the command `triton network list`:
+
+[source,shell-session]
+....
+$ triton network list
+SHORTID   NAME               SUBNET            GATEWAY        FABRIC  VLAN  PUBLIC
+b10a8f1c  zones              -                 -              -       -     false
+e4283953  zones-public       -                 -              -       -     false
+dbac7eb6  My-Fabric-Network  192.168.128.0/22  192.168.128.1  true    2     false
+....
+
+Generally, the network you will want to use for your zones is the one
+named `zones`.
+
+The use of other networks (especially `My-Fabric-Network` and `zones-public`)
+is covered in the section <<fabrics>>.
+
+The `zones` network will give your zone a "private" IP address on the UQ
+network, where you can access it over SSH from anywhere within UQ, it can
+access the Internet, and services like UQ single sign-on are available.
+
+Which networks you choose for your zone also determines which DNS names (and
+which URLs) you can use to access your zone.
+
+On the `zones` network, your zone will be given the internal DNS name
+`<account>-<alias>.zones.eait.uq.edu.au`, with `<account>` and `<alias>` replaced
+with your UQ username and the alias you set for the zone when creating it.
+
+Your zone will also be given a second "public" DNS name,
+`<account>-<alias>.uqcloud.net` for accessing a website hosted on it from both
+inside and outside the UQ network.
+
+For example, if my account name was `uqfoobar` and I created a zone named
+`myzone`, it would be given the DNS names `uqfoobar-myzone.zones.eait.uq.edu.au`
+and `uqfoobar-myzone.uqcloud.net`. When I want to use SSH to log in to my
+zone or talk to it directly, I would use the first name; and when I want to
+visit a website hosted on my zone I would use the second name.
+
+This bifurcation of DNS names is a unique attribute of the `zones` network and
+does not necessarily apply to other networks which may be available.
+
+TIP: Networks can be added and removed from zones after creation, but require
+     the zone to reboot each time a change is made.
+
+==== Short names
+
+If you create a zone named `foobar` on the `zones` network and you are the very
+first person to ever create a zone with that name, the zone will also be given
+the "short name" of `foobar.zones.eait.uq.edu.au`/`foobar.uqcloud.net`.
+
+You can use this name in place of the version with your account name in it
+if you wish.
+
+=== Metadata
+
+Depending on the particular image you've chosen, you might want or need to
+provide additional information when creating your zone.
+
+This additional information is known as "metadata", and comes in the form
+of `key=value` pairs, where the set of valid keys depends on the specific
+image.
+
+The *base OS images* do not accept any metadata parameters, so if you're using
+one of these you can safely skip this section.
+
+Each image here has a table of the keys which can be used with each one. These
+are only a brief summary; for some images (like `webproject`) more details can
+be found elsewhere in this guide about the specific role of each key.
+
+TIP: Metadata keys which are optional for a given image can generally be
+     changed later. Keys that are *required* at creation may often require you
+     to destroy and re-create the zone to change them, however.
+
+==== `ubuntu-krb5` image [[krb5-mdata]]
+
+[options="header"]
+|===
+| Key         | Required?       | Description   | Value format    | Example
+
+| `uq_users`  | no
+| UQ users who should be allowed to log into the zone
+| List of UQ usernames separated by spaces | `uqfoobar uqxyz s4xxxx`
+|===
+
+==== `webproject` image [[webproj-mdata]]
+
+[options="header"]
+|===
+| Key         | Required?       | Description   | Value format    | Example
+
+| `uq_users`  | no
+| UQ users who should be allowed to log into the zone
+| List of UQ usernames separated by spaces | `uqfoobar uqxyz s4xxxx`
+
+| `services`  | no
+| Webproject services which should be enabled in the zone during setup
+| List of services separated by spaces | `php mysql`
+
+| `vscoders`  | no
+| UQ users who should have VSCode enabled at boot
+| List of UQ usernames separated by spaces | `uqfoobar uqxyz`
+|===
+
+==== `jupyter` image
+
+See <<webproj-mdata>> above.
+
+==== `x2go-xfce4` image
+
+See <<krb5-mdata>> above.
+
+=== Creating a zone
+
+Now that we've chosen our basic parameters for our zone (a *name*, a
+*package*, an *image*, and the *networks* to use), we can finally create it.
+
+The command we use to create a new zone is `triton instance create` (or
+`triton inst create` for short). Using it looks like this:
+
+[source,shell-session]
+....
+$ triton instance create --wait \
+    --name <alias> \ <1>
+    --network <network> \ <2>
+    --metadata key=value \ <3>
+    <image> \ <4>
+    <package> <5>
+....
+<1> Replace `<alias>` with the name or alias you chose.
+<2> Replace `<network>` with the name of a network. You can give this option
+    more than once if you've chosen more than one network.
+<3> Replace `key` and `value` with a metadata key from the tables earlier if
+    needed, and the value you chose for each key. You can repeat this option
+    or leave it out.
+<4> Replace `<image>` with the name of the image you chose.
+<5> Replace `<package>` with the name of the package you chose.
+
+You can put that all on one line without the `\` characters if you wish, for
+example:
+
+[source,shell-session]
+....
+$ triton inst create --wait --name foobar --network zones webproject z1-standard
+Creating instance foobar (3b3f0124-05f9-eacc-8a8b-8b763e557507, webproject@3.0.4)
+Created instance foobar (3b3f0124-05f9-eacc-8a8b-8b763e557507) in 35s
+....
+
+The `--wait` option tells `triton` to wait until the new zone is fully up and
+running before it exits the command (the default is to exit immediately once
+the system has accepted the request, and then you would have to check on the
+status of the job later).
+
+Creation normally takes 30-60 seconds depending on the image and package
+which you chose.
+
+Once you see the `Created instance <name>` message, congratulations! You've
+successfully created a zone.
+
+If you want to log into your zone right away and get started, you can skip
+the remainder of this section and move straight to <<Accessing zones>>.
+
+=== Account limits
+
+You might try to create a zone and receive an error like this one:
+
+....
+triton instance create: error: error creating instance: Quota exceeded; to have your limits raised please contact Support
+....
+
+If you see this, it means you have exceeded the current limits on your account.
+
+To help manage the usage of UQcloud and allocate it fairly, each account has
+a limit, normally on the amount of RAM it can allocate.
+
+You can see your current limits and usage using the command
+`triton account limits`:
+
+[source,shell-session]
+....
+$ triton account limits
+TYPE        USED  LIMIT
+ram          384    512
+....
+
+Staff and student accounts start with an automatic default limit of 512 MB (the
+size of a single `z1-standard` zone).
+
+You can request an increase in your account limit by contacting the
+mailto:helpdesk@eait.uq.edu.au[EAIT IT helpdesk]. Please make sure to include
+a rough idea of how much memory you will require and what it's for. We are
+generally happy to accomodate any usage that is for a legitimate purpose
+related to coursework or research at the University.
+
+We do not generally allow the accounts of individuals to provision more than
+8 GB (8192 MB) of memory in zones. To get a higher limit than 8 GB, we usually
+recommend the creation of a "group account" for your project -- see the section
+<<Group accounts and managing access>> for further details.
+
+=== Changing zone settings after creation
+
+Many of the parameters we chose and provided during zone creation can be
+modified later. Each of the different parameters has a different command
+under the `triton instance` subcommand for modifying it.
+
+==== Changing zone name or alias
+
+To change the *alias* or name of a zone, use the `triton instance rename`
+command:
+
+[source,shell-session]
+....
+$ triton inst rename <old alias> <new alias>
+....
+
+==== Changing package
+
+To change the *package* for a zone, use the `triton instance resize` command.
+It takes the name of the zone to resize and the new package as arguments:
+
+[source,shell-session]
+....
+$ triton inst resize <alias> <package>
+....
+
+==== Changing metadata
+
+For metadata keys which can be changed after creation, the command
+`triton instance metadata update` can be used to modify them:
+
+[source,shell-session]
+....
+$ triton inst metadata update <alias> <key>=<value>
+....
+
+TIP: Metadata keys which can be changed after creation may only be checked
+     periodically by the zone for changes (e.g. the `uq_users` key is usually
+     only checked once an hour), so it may take some time for your change to
+     have an effect on the zone.
+
+==== Changing networks
+
+Changing which *networks* a zone is using can be done through the subcommands
+of `triton instance nic`. "NIC" is an abbreviation for "network interface card":
+each NIC represents a connection between your zone and a particular network.
+
+First, use the `triton instance nic list` command to get information about
+the NICs currently attached to your zone:
+
+[source,shell-session]
+....
+$ triton inst nic list foobar
+IP                MAC                STATE    NETWORK
+172.23.82.135/22  90:b8:d0:c2:9c:36  running  0ce96a79
+....
+
+The value in the "Network" column, annoyingly, cannot easily be matched up
+against the list of network from `triton network list` in order to check
+which network it actually is. This is because the `zones` network is actually
+a "network pool", which contains several other "real" networks (one of which is
+`0ce96a79`).
+
+Let's say we now want this zone to also be on our fabric network
+(`My-Fabric-Network`). We would use the command `triton instance nic create`
+to add a new NIC:
+
+[source,shell-session]
+....
+$ triton inst nic create foobar My-Fabric-Network
+Created NIC 90:b8:d0:c8:d9:5a
+....
+
+We can also delete the old NIC using its MAC address from the second column:
+
+[source,shell-session]
+....
+$ triton inst nic delete foobar 90:b8:d0:c2:9c:36
+Delete NIC "90:b8:d0:c2:9c:36"? [y/n] y <1>
+Deleted NIC 90:b8:d0:c2:9c:36
+....
+<1> Press the `y` key here to confirm.
+
+TIP: Changes made to NICs will not show up within the zone immediately, as it
+     must be rebooted for network changes to take effect. After rebooting, the
+     new network interfaces will appear within the zone.
+
+=== Errors and mistakes
+
+TODO: some common errors while creating/managing zones
+
+....
+triton instance create: error: error creating instance
+    alias: Duplicate: Already exists for this owner_uuid: Invalid VM parameters: Invalid machine name
+....
+
+=== Destroying zones
+
+You can destroy a zone by using the `triton inst rm` command:
+
+[source,shell-session]
+....
+$ triton inst rm foobar
+....
+
+Note that this will also destroy all data stored inside the zone.
+
+=== Backups and snapshots
+
+Zones running on UQcloud are provided by the system with automatic snapshots
+and backups.
+
+Every hour, your zone will be snapshotted and the snapshot copied to a backup
+server for safe-keeping. Each day and each week an additional snapshot is also
+taken, to be kept for a longer period.
+
+For the last few snapshots of each kind (hourly, daily, weekly), you can access
+the data belonging to your zone as it was at the time the snapshot was taken
+by looking in the `/checkpoints` directory in your zone.
+
+Some zones may find that their snapshots take up a significant portion of their
+disk space usage (e.g. because they re-write a lot of data on a regular basis).
+
+If this is causing a problem for your zone, please email
+mailto:helpdesk@eait.uq.edu.au[helpdesk] and we can give you some options for
+what to do.
+
+If you need access to older snapshots at any point, or to roll back to an older
+snapshot of your zone (e.g. because you have accidentally done something that
+prevents it from starting up), please also contact
+mailto:helpdesk@eait.uq.edu.au[helpdesk].
+
+== Accessing zones
+
+All zones may be accessed for administration purposes through the commandline,
+though there is some variation in the specific method between images -- for
+example, in whether SSH access uses UQ usernames and passwords or not.
+
+Access is also possible for other purposes than administration (e.g. accessing
+the website hosted on the zone). This section will focus only on administrative
+commandline access and the methods for achieving it.
+
+=== SSH as root using public keys
+
+All types of zone images support SSH login as `root` using SSH public key
+authentication. The public keys allowed for login as `root` are the same keys
+which were added to the Triton account which created the zone at the time the
+zone was created.
+
+If you used `sdc-setup` on `mango.eait.uq.edu.au` or `moss.labs.eait.uq.edu.au`
+to create your SSH key pair for access to Triton, then you can also SSH from
+there to your zone as `root`.
+
+For example:
+
+[source,shell-session]
+....
+uqfoo@mango:~$ triton inst create --wait --name foobar ...
+Creating instance foobar (3b3f0124-05f9-eacc-8a8b-8b763e557507, webproject@3.0.4)
+Created instance foobar (3b3f0124-05f9-eacc-8a8b-8b763e557507) in 35s
+
+uqfoo@mango:~$ ssh root@uqfoo-foobar.zones.eait.uq.edu.au <1>
+The authenticity of host 'uqfoo-foobar.zones.eait.uq.edu.au (172.23.81.235)' can't be established.
+ECDSA key fingerprint is SHA256:/ZwtxL8ZufYDK7xTXVmQ7wxS4s/JlW6GjiGE6K+kqVE.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes <2>
+Warning: Permanently added 'uqfoo-foobar.zones.eait.uq.edu.au' (ECDSA) to the list of known hosts.
+
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 4.3.0 x86_64)
+
+...
+Last login: Fri Jan 31 06:30:52 2020 from 10.33.1.141
+root@foobar:~#    <3>
+....
+<1> Use the `ssh` command to connect onwards from `mango` to your zone
+<2> The first time you connect to a new zone, you will receive this warning.
+    At least on `mango`, you can safely ignore it and type `yes`, since the
+    network between `mango` and your zone is trustworthy.
+<3> This is the shell prompt from inside your zone.
+
+TIP: For zones using UQ customised images or native SmartOS images, the SSH keys
+     are kept up to date after zone creation as well, so that they always
+     reflect the same set that you use for access to the `triton` command.
+     Linux base OS images do not do this, and the set of keys allowed is only
+     set at the creation of the zone.
+
+=== Direct login via "triton inst exec"
+
+As well as access via SSH, all zones also support the ability to directly
+run a command as `root` inside the zone using the `triton inst exec` command.
+
+You can use this to start an interactive `root` shell:
+
+[source,shell-session]
+....
+$ triton inst exec foobar -- bash --login <1>
+root@foobar:/#     <2>
+....
+<1> Note that the `--` is needed to separate options that are used for the
+    `triton` command itself from options that will be given to `bash` inside
+    the zone.
+<2> This is the shell prompt from inside your zone.
+
+This conveniently works even when your SSH keys have changed since the zone
+was created, and can also be a good fall-back if you somehow break SSH.
+
+=== SSH and SFTP with UQ usernames and passwords
+
+For zones based on the `ubuntu-krb5` image, or any of its descendants (such as
+`webproject`), you can also log into your zone over SSH using UQ usernames and
+passwords.
+
+This is particularly useful as you can allow login by other users to your
+specific zone without having to ask for their SSH keys or add those keys
+anywhere.
+
+To set the list of users who are allowed to log in, you can either provide
+or edit the `uq_users` metadata key, or from within the zone you can also use
+the `uq-add-user` command:
+
+[source,shell-session]
+....
+root@foobar:/# uq-add-user uqfoo
+....
+
+TIP: You can also run the `uq-add-user` command inside a zone using one of the
+     other methods outlined above (e.g. by running
+     `triton inst exec foobar uq-add-user uqfoo`)
+
+Then you can SSH to the zone as `uqfoo`:
+
+[source,shell-session]
+....
+$ ssh uqfoo@uqfoo-foobar.zones.eait.uq.edu.au <1>
+Password: <2>
+...
+uqfoo@foobar:/$ <3>
+....
+<1> Replace `uqfoo` with your UQ username.
+<2> Enter your normal UQ password.
+<3> This is the shell prompt from inside your zone.
+
+The users created by either of these methods by default are allowed to use
+the `sudo` command to become `root`. You will need to use this command in order
+to execute most administrative functions.
+
+In zones based on the `ubuntu-krb5` image and any of its descendants, the
+SSH public keys belonging to each user will also be accepted for login as well
+as their UQ password.
+
+With a UQ user account, you can also access your zone over SFTP using a client
+such as {uri-winscp}[WinSCP] or {uri-filezilla}[FileZilla].
+
+For these clients, use the internal hostname of your zone (ending in
+`.zones.eait.uq.edu.au`) and your UQ username and password to log in, and then
+you can drag and drop files or folders from your local machine into the zone.
+
+TIP: In FileZilla, don't forget to choose port 22, or add `sftp://` at the
+     beginning of your zone's hostname. If you don't do this, it will try to
+     use FTP rather than SFTP, which will not work.
+
+=== From outside the UQ network
+
+When you are working from outside the UQ network, direct SSH access to your
+zone will not be possible if it is a normal zone on the `zones` network.
+
+Of the methods outlined above, only the `triton inst exec` method will work
+unmodified from outside the UQ network.
+
+Instead, you will need to either get your machine access to UQ networks (e.g. by
+logging into the {uri-uqvpn}[UQ VPN] or {uri-eaitvpn}[EAIT VPN]), or proxy
+your SSH connection via `mango.eait.uq.edu.au` or `moss.labs.eait.uq.edu.au`.
+
+"Proxying" can simply mean logging into `mango` or `moss` first and using the
+`ssh` command there; or you can set up SSH client features such as `ProxyJump`.
+
+For example, on MacOS or Linux, if you add this to your `+~/.ssh/config+` file:
+
+[source,ssh]
+....
+Host *.zones.eait.uq.edu.au
+  ProxyJump uqfoo@mango.eait.uq.edu.au
+....
+
+Then whenever you use a command such as `ssh root@foobar.zones.eait.uq.edu.au`
+on your local machine, the SSH client will automatically open a connection to
+`mango.eait.uq.edu.au` and proxy your traffic through it, without you having
+to open up a second shell yourself.
+
+An equivalent to this feature is also available {uri-winscp-tunnel}[in WinSCP].
+
+=== When things go wrong
+
+TODO: failed SSH login due to being off UQ network (timeout)
+
+TODO: failed login due to out of memory or out of disk
+
+TODO: failed login due to no DNS entry (provisioned on fabric only)
+
+TODO: failed login due to disabled/crashed/badly configured SSH daemon
+
+
+== Getting around the "webproject" image [[webproject]]
+
+TIP: This section is specifically for users of zones based on the `webproject`
+     image (version 3.0.0 or later).
+
+The `webproject` image is designed as a flexible starting point for a lot of
+common web application frameworks and databases. It comes pre-configured for
+the following:
+
+ * PHP
+ * uwsgi (for Python frameworks, including Django, Flask etc)
+ * node.js
+ * Puma (for Ruby frameworks, including Ruby on Rails, Sinatra etc)
+ * Tomcat (for JSP and Java)
+ * ASP.net via CoreCLR
+ * MySQL
+ * PostgreSQL
+ * MongoDB
+
+The phpMyAdmin web-based management tool for MySQL is also pre-installed
+and configured.
+
+Zones based on `webproject` can also be used for other web frameworks or
+databases not included on this list, and it comes with other language
+runtimes installed as well (e.g. Go).
+
+The image is based on Ubuntu (18.04 in image version 3.x), meaning that most
+advice and material you will find online for settings things up on Ubuntu or
+Debian Linux distros can be applied.
+
+There are some details specific to the exact setup in the image though which
+are important to be aware of. For example, the image is set up to use `nginx`
+rather than the more typical Apache webserver in order to conserve memory
+and operate well even in small zone packages.
+
+To get your project up and running quickly, we recommend you read at least
+the following section, <<Overview of design>> and the section
+<<Using "webprojctl">>. Then it should be safe to skip to the specific
+part of the <<webproject-frameworks>> section for the framework you're using.
+
+The rest of this section may be important later on, however, once you have
+your application set up and want to customise it or get it ready for users.
+
+=== Overview of design
+
+All of the web application frameworks in the `webproject` image are set up to
+be run behind the `nginx` web server, which answers requests for the zone.
+
+Depending on the particular framework in use, the `nginx` process might use
+FastCGI, WSGI, or plain HTTP as the protocol to connect to the application
+server.
+
+The general flow of requests looks roughly like the following diagram
+(everything that runs inside your zone is on the right-hand side of the
+middle dividing line):
+
+[svgbob]
+....
+                                      +
+                                      |     YOUR    ZONE
+                                      |
++------+                              |                         +----------------+        +--------------+
+|      |         +---------------+    |      +-------+  one of  |  fcgi server   |        |   database   |
+| User +-------->|     EAIT      |---------->| nginx |----+---->| (e.g. php fpm) |------->| (e.g. MySQL) |
+|      |  HTTPS  | loadbalancers |   HTTP    +-------+    |     +----------------+        +--------------+
++------+         +---------------+    |                   |
+                                      |                   |     +----------------+
+                                      |                   |     |  wsgi server   |
+                                      |                   +---->| (e.g. python)  |------->  ...
+                                      |                   |     +----------------+
+                                      |                   |
+                                      |                   |     +----------------+
+                                      |                   |     |  http server   |
+                                      |                   +---->| (e.g. node.js) |------->  ...
+                                      |                         +----------------+
+                                      |
+....
+
+It's worth noting that `nginx` will generally only be talking to one web
+application framework (application server) at a time (though you can also
+use more advanced configurations where more than one is running at once).
+
+When you create a new `webproject` zone (without setting the `services`)
+metadata, nothing is running except `nginx` by default, and the `nginx` is not
+configured to use any particular framework.
+
+The `webprojctl` command can be used to enable services and configure `nginx`
+for you (see the next section, <<Using "webprojctl">>).
+
+In the default state, `nginx` will serve static files from the `/var/www/htdocs`
+directory -- so if your website consists just of plain HTML files (plus e.g.
+CSS and images), you can simply place the files in that directory and not
+worry about enabling any frameworks.
+
+TIP: It's not a great idea to install Apache or another web server into a zone
+     based on the `webproject` image. If you really want to use Apache or
+     LigHTTPd or another web server, it's probably best to start from a base
+     OS image or `ubuntu-krb5`. The section
+     <<Setting up web applications from scratch>> can help you with doing this.
+
+=== Using "webprojctl"
+
+To help with configuring `webproject` image based zones, the image provides
+a command named `webprojctl` which can enable and disable the different
+application frameworks.
+
+This command will automatically enable services (`systemd` units) and also
+reconfigure `nginx` for you.
+
+We can see which frameworks are enabled by running the command
+`webprojctl status`:
+
+[source,shell-session]
+....
+root@foobar:~# webprojctl status
+enabled:
+available: php, uwsgi (python), nodejs, puma (ruby / rails), jsp, tomcat (jsp / java), dotnet, mysql, postgres, mongodb
+....
+
+To enable or disable one of the frameworks, we can use the commands
+`webprojctl enable <service>` and `webprojctl disable <service>`:
+
+[source,shell-session]
+....
+root@foobar:~# webprojctl enable php
+== enabling php...
+Created symlink from /etc/nginx/frameworks-available/php.conf to /etc/nginx/frameworks-enabled/php.conf
+Reloading nginx configuration
+Enabling systemd unit php7.2-fpm
+Synchronizing state of php7.2-fpm.service with SysV init with /lib/systemd/systemd-sysv-install...
+Executing /lib/systemd/systemd-sysv-install enable php7.2-fpm
+Enabling systemd unit phpsessionclean.timer
+Created symlink from /etc/systemd/system/timers.target.wants/phpsessionclean.timer to /lib/systemd/system/phpsessionclean.timer.
+Enabling systemd unit phpsessionclean.service
+
+REMINDERS:
+ * Place .php files in /var/www/htdocs
+....
+
+TIP: As indicated by the prompts above (`+root@foobar:~#+`), the `webprojctl`
+     command must be run as `root`. You can prefix the command with `sudo` if
+     logged in as an ordinary user.
+
+After `webprojctl` enables a new framework for you it will sometimes print
+reminders about how to use the framework in question. These reminders are
+explained in more detail in the section of this document entitled
+<<webproject-frameworks>>.
+
+The `webprojctl` can also be used to enable and disable databases such as
+MySQL:
+
+[source,shell-session]
+....
+root@foobar:~# webprojctl enable mysql
+== enabling mysql...
+Enabling systemd unit mysql
+Synchronizing state of mysql.service with SysV init with /lib/systemd/systemd-sysv-install...
+Executing /lib/systemd/systemd-sysv-install enable mysql
+
+REMINDERS:
+ * The MySQL "root" user password can be retrieved by running "mdata-get mysql_pw"
+ * If you want to use phpMyAdmin, you will need to enable "php" as well
+....
+
+Some web frameworks' configurations are mutually incompatible (e.g. because they
+both try to handle the `/` URL at the top of your website). When you try to
+enable one, `webprojctl` will automatically disable the other.
+
+=== Editing nginx configuration
+
+Internally, the `webprojctl` command does two things:
+
+ 1. It manages `systemd` units, by running the `systemctl` command; and
+ 2. It reconfigures `nginx` by creating symbolic links (symlinks) to
+    configuration files for each framework.
+
+The first of these is fairly straight-forward, and lots of documentation about
+`systemd` unit files and how to use them can be found online. A `systemd` unit
+represents a "service" (usually just one program) which you want to be running
+on the system. You set up a "unit file" to tell `systemd` about the program you
+want to be running, then you "enable" and "start" the unit, and `systemd` will
+begin managing it.
+
+For the second responsibility, the `nginx` configuration is kept in `/etc/nginx`
+and is split up into several sub-directories.
+
+When `nginx` starts up, it will begin by processing `/etc/nginx/nginx.conf`.
+This config file contains several `include` directives which cause nginx to
+read other files in the sub-directories.
+
+The structure of includes looks roughly like this:
+
+[svgbob]
+....
+                    +-------------------+
+                +-->| modules-enabled/* |
+                |   +-------------------+
+                |
+                |
++------------+  |      +-----------+             +-----------+
+| nginx.conf |--+----->|  conf.d/* |------+----->| auth.conf |
++------------+  |      +-----------+      |      +-----------+
+                |                         |
+                |                         |      +-------------------------+
+                |                         +----->| connection-upgrade.conf |
+                |                         |      +-------------------------+
+                |                         |
+                |                         +-----> ...
+                |
+                |    +-----------------+        +--------------+       +----------------------+
+                +--->| sites-enabled/* |---+--->|  https_site  |------>| frameworks-enabled/* |
+                     +-----------------+   |    +--------------+       +----------------------+
+                                           |
+                                           |    +--------------+
+                                           +--->|  http_site   |
+                                                +--------------+
+....
+
+You'll notice that there are several subdirectories ending with `-available`
+which do not appear in the above diagram at all. The idea is that each of the
+`-enabled` directories has a matching `-available` directory, where all of the
+possible options are stored. Then, to enable a particular option we make a
+symlink from the `-enabled` directory into the `-available` one.
+
+When `webprojctl` reconfigures `nginx`, it creates symlinks in the
+`frameworks-enabled` directory pointing to the pre-made config files in
+`frameworks-available`.
+
+You'll see one file in there for each of the framework options in `webprojctl`
+which requires `nginx` configuration:
+
+[source,shell-session]
+....
+root@foobar:~# ls -la /etc/nginx/frameworks-available
+total 14
+drwxr-xr-x  2 root root  11 Jan 31 04:49 .
+drwxr-xr-x 10 root root  21 Jan 16 00:42 ..
+-rw-r--r--  1 root root 752 Jan 16 00:22 custom-proxy.conf
+-rw-r--r--  1 root root  97 Jan 13 05:13 default.conf
+-rw-r--r--  1 root root 120 Jan 15 06:11 dotnet.conf
+-rw-r--r--  1 root root 120 Jan 15 05:39 nodejs.conf
+-rw-r--r--  1 root root 561 Jan 16 00:22 php.conf
+-rw-r--r--  1 root root 161 Jan 16 00:22 puma.conf
+-rw-r--r--  1 root root 593 Jan 31 04:49 tomcat.conf
+-rw-r--r--  1 root root 159 Jan 15 05:10 tomcat-jsp-only.conf
+-rw-r--r--  1 root root 121 Jan 13 06:18 uwsgi.conf
+....
+
+And if we have PHP enabled, for example:
+
+[source,shell-session]
+....
+root@foobar:~# ls -la /etc/nginx/frameworks-enabled
+total 3
+drwxr-xr-x  2 root root  3 Feb  2 23:28 .
+drwxr-xr-x 10 root root 21 Jan 16 00:42 ..
+lrwxrwxrwx  1 root root 40 Feb  2 23:28 php.conf -> /etc/nginx/frameworks-available/php.conf
+....
+
+Any file that is symlinked into the `frameworks-enabled` directory will be
+included into the `https_site` configuration by default, so you can also add
+your own frameworks and symlink them yourself.
+
+There is an example in `/etc/nginx/frameworks-available/custom-proxy.conf` which
+contains comments giving some guidance on how to make your own framework file
+for an app server that accepts HTTP connections on localhost, should you need
+one.
+
+After editing any of the `nginx` configuration files, you can trigger `nginx`
+to reload them by running `systemctl reload nginx`:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl reload nginx
+....
+
+TIP: Editing the `nginx` configuration files and reloading them must be done as
+     the `root` user. If you're logged in as a normal user, you can use the
+     `sudo` command to run your editor as `root`, or copy over the file with a
+     new version with `sudo cp ...`.
+
+=== Web single sign-on and access control
+
+When you create a new `webproject` based zone and try to visit the website
+hosted on it (e.g. just going to the default `index.html` page), you will
+notice that it requires you to log in with UQ Single Sign-On.
+
+The image is set to require single sign-on to access the website for both
+privacy and security reasons (e.g. while initially setting something up you
+might not have your own access control working yet). You can change the
+configuration to allow public access, however, or even restrict it further
+(e.g. to specific users or groups).
+
+The built-in Single Sign-On support is handled entirely within the `nginx`
+webserver component. Your application server does not have to be made aware
+of SSO or any of its consequences by default.
+
+Configuring the default access rules for your website is done in the config
+file `/etc/nginx/conf.d/auth.conf`. This file contains a series of rules
+describing which URLs should have which access control list applied to them.
+
+The default configuration looks like this (with comments removed):
+
+[source,nginx]
+....
+map $uri $acl {
+   default		"allow:user:*";
+
+   ~^/phpmyadmin	"allow:user:*local, allow:group:'eait:itig'";
+   ~^/manager		"allow:user:*local, allow:group:'eait:itig'";
+   ~^/host-manager	"allow:user:*local, allow:group:'eait:itig'";
+
+   /favicon.ico	"allow:*";
+}
+....
+
+The `map $uri $acl` at the start is an {uri-nginx-map}[`nginx` map directive]
+which tells `nginx` to set one variable based on the value of another. In this
+case we are setting `$acl` based on the contents of `$uri`.
+
+The `$uri` variable is the path which the user is accessing on our website:
+for example, if the user had `https://foobar.uqcloud.net/test/thing` in their
+browser's address bar, then the value of `$uri` here would be `/test/thing`.
+
+The `$acl` variable should be set to the "access control list" (ACL) that we
+want the SSO support to use to decide who is allowed to access the page and
+whether they are required to log in.
+
+Each ACL consists of a number of "stanzas" separated by commas. Each stanza
+has 3 parts: an action, a type of target, and optionally further information
+needed to work out what target you mean. The parts of each stanza are separated
+by colons.
+
+The possible actions are:
+
+ * `allow`; and
+ * `deny`.
+
+The SSO processing module will consider the ACL stanzas one by one, in the
+order written, looking for one which matches the request. The first entry to
+match will determine what action the module takes (allowing the request, or
+denying it). If no stanzas match the request, then the request is denied (it
+is a "default deny" or "whitelist" system).
+
+The possible types of target are:
+
+ * `user` -- a specific UQ user, identified by their username, or by a special
+         username containing the asterisk character `*`
+ * `group` -- a UQ AD or LDAP group, identified by its domain-qualified name,
+          which the user must be a member of in order to match
+ * `*` -- matches any request, whether logged in or not
+
+For the `user` type, the possible special usernames are:
+
+ * `*` -- matches any logged in user
+ * `*local` -- matches any user who has an account on the zone (e.g. they have
+           been added by running `uq-add-user`)
+
+For the `group` type, the format of the group name should be `domain:group`,
+where the domains available are:
+
+ * `uq` -- UQ central ActiveDirectory groups
+ * `eait` -- EAIT staff ActiveDirectory groups
+ * `labs` -- EAIT student labs ActiveDirectory groups
+
+The `labs` domain includes groups for currently enrolled courses, which can be
+used to write stanzas which match all students enrolled them. The section
+<<UQ single sign-on via fakvd>> includes further information about using these.
+
+When the SSO module finds that the only rule that could allow access requires
+it to know which user is logged in or their group memberships, it forces them
+to log in before continuing processing. If, however, it finds a rule which
+matches without login information (e.g. `allow:*`), then it skips login.
+
+From this we can decode what will happen with the ACL examples in the default
+configuration above:
+
+`allow:user:*`:: Visitors will be required to log in, but any logged in user
+    will be given access.
+`allow:user:*local, allow:group:'eait:itig'`:: Visitors will be required to log
+    in, and then only users who either have a local account on the zone, or who
+    are members of the `eait:itig` AD group, will be allowed access.
+`allow:*`:: Visitors will not be required to log in, SSO processing will be
+    skipped.
+
+==== Enabling public access
+
+To enable public access to our website, we should change the `default` line
+in `/etc/nginx/conf.d/auth.conf` to the ACL value `allow:*`. This will stop
+visitors from being required to log in.
+
+The final configuration should look like:
+
+[source,nginx]
+....
+map $uri $acl {
+   default              "allow:*";
+}
+....
+
+==== Using SSO information in your application
+
+Your application can use the information that `nginx` has already gathered
+about the user via SSO to make further decisions itself (for example you
+might want to look the user up in a database).
+
+Information about how to do this is included in the sections for each
+web framework, and also in the section <<UQ single sign-on via fakvd>>.
+
+=== MySQL password management
+
+The MySQL database server in the `webproject` image is set up with an
+administrator user named `root`, which has a randomly generated password that
+is different on each zone.
+
+You can find out what the randomly-generated password for your zone was set
+to by running the command `mdata-get mysql_pw` inside the zone as `root`:
+
+[source,shell-session]
+....
+uqfoo@foobar:~# sudo mdata-get mysql_pw
+8bf3863cf5ba6195
+....
+
+You can also find it from outside the zone by using the command
+`triton inst get --credentials <alias>`, which will include a section under
+`"metadata"` named `"credentials"` containing the `"mysql"` password value:
+
+[source,shell-session]
+....
+$ triton inst get --credentials foobar
+{
+    "id": "3b3f0124-05f9-eacc-8a8b-8b763e557507",
+    "name": "foobar",
+    "type": "smartmachine",
+    "brand": "lx",
+    "state": "running",
+    ...
+    "metadata": {
+        "root_authorized_keys": "...",
+        "credentials": {
+            "mysql": "8bf3863cf5ba6195"
+        }
+    },
+    ...
+}
+
+....
+
+The `webproject` image also includes phpMyAdmin, a web-based tool for managing
+the database. Normally phpMyAdmin would require you to enter the `root` password
+in order to log in and use it. To save new users some time and effort (and
+enable using the image for situations where we might want a user to be able
+to access phpMyAdmin but not log in over SSH), the phpMyAdmin has been modified
+to support Single Sign-On.
+
+This means that the actual password of the `root` user has to be kept available
+to the phpMyAdmin code which handles SSO login, so that it can correctly
+authenticate to MySQL once it has validated your SSO session.
+
+The image setup process places the password in the file
+`/usr/share/phpmyadmin/signon.php`, which is set as the SSO handler in
+the phpMyAdmin configuration in `/etc/phpmyadmin/config.inc.php`.
+
+If you decide to change the `root` password for MySQL to a different value from
+its randomly generated default, then the password kept in phpMyAdmin will no
+longer be correct, which will stop phpMyAdmin from being able to log in.
+
+This normally manifests as a "Too many redirects" error in your web browser. If
+you see this error, you probably need to check whether the MySQL `root`
+password has been changed.
+
+It's generally recommended to simply not change the password and leave it at
+the default value, but if you really need to change it and still want phpMyAdmin
+SSO support to work, you should edit `/usr/share/phpmyadmin/signon.php` and
+update it there.
+
+TIP: If you ever change the MySQL root password accidentally or to a value
+     you've forgotten or lost, you can use the command `sudo uq-reset-mysql` to
+     change it back to the default. It doesn't require the current password,
+     and will keep your database intact.
+
+=== Filesystem permissions
+
+The `webproject` image is designed for convenience, including with regards to
+filesystem permissions on the shared `/var/www` directory.
+
+Setting up most types of web applications will require writing to files under
+`/var/www` as your logged in user, and in collaborative situations (e.g. working
+on a team project), each person will typically be logged in as themselves over
+SSH.
+
+As a result, the image places special advanced permissions on the `/var/www`
+directory to make sure that it remains writeable by SSH users, even when the
+files are owned by someone else.
+
+For example, if I have two users, `uqfoo` and `uqbar` logged into a zone:
+
+[source,shell-session]
+....
+uqfoo@foobar:~$ echo hi > /var/www/htdocs/test.html
+uqfoo@foobar:~$ ls -la /var/www/htdocs/test.html
+-rw-rw-r-- 1 uqfoo sysadmin 3 Feb  3 07:13 /var/www/htdocs/test.html
+
+uqbar@foobar:~$ echo hi again >> /var/www/htdocs/test.html
+uqbar@foobar:~$ cat /var/www/htdocs/test.html
+hi
+hi again
+....
+
+As you can see, both users can edit files freely in the `/var/www` directory,
+including those created and owned by another user.
+
+Unfortunately, the `chmod` command, including when used via SFTP can strip
+away these permissions and cause the directory to revert to only being writeable
+by `root`.
+
+As a result, it's recommended that you *avoid using the `chmod` command* in your
+zone entirely. Also avoid the "Edit file permissions" dialog in a graphical
+SFTP client.
+
+If you encounter instructions online for using `chmod` to make a file or
+directory writeable by your web server (e.g. a `logs` folder or temporary file)
+you should instead use the command `chown` to change the ownership of the file
+to the user `www-data`:
+
+[source,shell-session]
+....
+uqfoo@foobar:~$ sudo chown www-data /var/www/htdocs/tmp/
+[sudo] password for uqfoo:
+uqfoo@foobar:~$ ls -la /var/www/htdocs/tmp
+drwxrwxr-x 2 www-data sysadmin 2 Feb  3 07:18 .
+....
+
+This will allow the web server to write to this directory freely, without
+stripping the ability of your regular SSH users to manage it without having
+to `sudo` every command.
+
+NOTE: Do not run the command `chmod -R 777 ...` on a zone, no matter what your
+      instructors or steps online might say. This command is very easy to
+      mis-use by accident and may cause your zone to no longer be able to accept
+      logins or new connections. If you run this command by mistake and your
+      zone is broken, you will need to contact
+      mailto:helpdesk@eait.uq.edu.au[Helpdesk] and ask them to recover any data
+      you need from the zone before resetting it to a previous snapshot.
+
+==== Behind the curtain
+
+The permissions on the `/var/www` directory are set by using the "native"
+`chmod` tool, which you can find in `/native/usr/bin/`. You can find out
+more about them by reading {uri-man-chmod}[the illumos man page], in particular
+the section entitled "ACL Operations".
+
+If you need to restore the original permissions on `/var/www` at some point,
+you can either email mailto:helpdesk@eait.uq.edu.au[Helpdesk], or, if you're
+an advanced user and want to try it yourself, look at what `zoneinit` does when
+it initialises the zone (`zoneinit` is located in `/usr/local/sbin`).
+
+
+=== Using Visual Studio `code-server`
+
+The `webproject` image as of version 3.1.0 contains built-in support for
+using the web-hosted version of Visual Studio Code (`code-server`) for editing
+your website and code.
+
+The image is set up to spawn one `code-server` for each enabled user. As each
+of these uses quite a lot of RAM (around ~200 MB RSS per instance is typical),
+you must enable each user individually to avoid accidentally using up all of
+the zone's memory.
+
+To enable support for VSCode globally in your zone, enable the `webprojctl`
+feature `vscode`:
+
+[source,shell-session]
+....
+root@foobar:~# webprojctl enable vscode
+== enabling vscode...
+Created symlink from /etc/nginx/frameworks-available/vscode.conf to /etc/nginx/frameworks-enabled/vscode.conf
+Reloading nginx configuration
+
+REMINDERS:
+ * VSCode has to be started for each user individually by running "sudo systemctl start code-server@USERNAME"
+Further instructions available at: https://help.eait.uq.edu.au/smartos/webproject
+....
+
+You can set which users are enabled by providing the metadata property
+`vscoders` at provisioning time, or you can enable them later by using the
+command `systemctl start code-server@USERNAME`:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl start code-server@uqfoobar
+....
+
+Using `systemctl start` will turn on VSCode for that user until the next reboot.
+If you want a user's `code-server` instance to also start automatically after
+reboot, you can use the `systemctl enable` command:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl enable code-server@uqfoobar
+....
+
+To access the VSCode instance on your zone, visit
+`https://<user>-<alias>.uqcloud.net/vscode/` in your web browser:
+
+.Accessing the VSCode instance in a zone
+image::vscode-zone.png[Screenshot,600]
+
+
+== Setting up specific types of applications on "webproject" [[webproject-frameworks]]
+
+TIP: This section is specifically for users of zones based on the `webproject`
+     image (version 3.0.0 or later).
+
+=== PHP with MySQL
+
+To use PHP/MySQL with `webproject`, enable the `webprojctl` frameworks `php`
+and `mysql`:
+
+[source,shell-session]
+....
+root@foobar:~# webprojctl enable php
+root@foobar:~# webprojctl enable mysql
+....
+
+Place your PHP files in `/var/www/htdocs`. There is an example `test.php`
+there already which you can visit in a web browser to check that PHP is
+working correctly.
+
+==== phpMyAdmin
+
+Once both PHP and MySQL are enabled, you can immediately use the phpMyAdmin
+web interface, by visiting `https://foobar.uqcloud.net/phpmyadmin` (replacing
+`foobar.uqcloud.net` with the public hostname of your zone).
+
+==== Connecting to MySQL
+
+The recommended way to connect to MySQL from PHP is to use {uri-pdo}[PDO]. The
+MySQL server is set up to listen on `localhost`.
+
+Create a new MySQL user for your web application to log in as rather than
+logging in as `root` -- this enables you to limit the impact of security
+problems in your application somewhat. You can create the new user either with
+phpMyAdmin, or by running `GRANT` SQL DDL statements at the MySQL prompt.
+
+Once you've created the user, to connect using PDO you'll need something like
+this:
+
+[source,php]
+....
+$connection = new PDO("mysql:host=localhost;dbname=foobar", $username, $password);
+....
+
+==== Handling other URLs with PHP
+
+Normally, PHP will only handle URLs which end in `.php` -- for example,
+`https://foobar.uqcloud.net/test.php`. You can also configure `nginx` to send
+all URLs that don't match an exact file on disk to a particular PHP script --
+this is particularly useful with web frameworks like {uri-laravel}[Laravel].
+
+To enable this, edit `/etc/nginx/frameworks-available/php.conf` and add the
+following snippet near the bottom:
+
+[source,nginx]
+....
+location / {
+    try_files $uri $uri/ /index.php?$query_string;
+}
+....
+
+Then reload the `nginx` configuration with `sudo systemctl reload nginx`.
+
+This will cause `index.php` to handle all requests for unknown paths that
+don't match a real file or directory in `/var/www/htdocs`, so that you (or
+your PHP framework like Laravel) can then use `$_SERVER['REQUEST_URI']` to find
+out what was requested.
+
+==== Accessing SSO information
+
+The `webproject` image adds a directory to the PHP include path named `uq`,
+which contains some utilities for working with SSO information.
+
+An example:
+
+[source,php]
+....
+<?php
+require_once('uq/auth.php');
+
+auth_require();
+print_r(auth_get_payload());
+....
+
+The functions available in `uq/auth.php` are as follows:
+
+==== `+auth_require()+`
+
+Description:: If there is no current SSO session, this redirects the user to
+          force them to log in. If there is a current session, asserts
+          that the session is valid and then returns.
+
+Arguments:: none
+
+Return value:: none
+
+==== `+auth_get_payload()+`
+
+Description:: If there is no current SSO session, this retrieves the information
+          available about the user and returns it as an associative array.
+
+Arguments:: none
+
+Return value:: `array($string => $string)`: the authentication payload; or
+          `false`: no current SSO session or session valid.
+
+==== `+auth_is_member($group)+`
+
+Description:: Tests whether a user is logged in via SSO and they are a member
+          of the given group.
+
+Arguments::
+ * `$group` -- a string, in the `domain:group` form
+
+Return value:: `true`: if the user is logged in and belongs to the group;
+           `false`: otherwise.
+
+==== `+auth_require_member($group)+`
+
+Description:: If there is no current SSO session, this redirects the user to
+          force them to log in. If there is a current session, checks
+          that the user is a member of the given group. If they are not,
+          serves a 403 error.
+
+Arguments::
+ * `$group` -- a string, in the `domain:group` form
+
+Return value:: none
+
+==== `+auth_is_user($user)+`
+
+Description:: Tests whether a user is logged in via SSO and has the login name
+          given.
+
+Arguments::
+ * `$user` -- a string, login name
+
+Return value:: `true`: if the user is logged in and their login name is `$user`;
+           `false`: otherwise.
+
+==== `+auth_require_user($user)+`
+
+Description:: If there is no current SSO session, this redirects the user to
+          force them to log in. If there is a current session, checks
+          that the user's login name matches the given argument. If it does
+          not, serves a 403 error.
+
+Arguments::
+ * `$user` -- a string, login name
+
+Return value:: none
+
+==== More complex PHP applications
+
+For some more complex PHP applications (such as {uri-drupal}[Drupal]) there
+are likely to be instructions available online for how to configure them with
+`nginx`.
+
+For example, for Drupal specifically there is
+{uri-drupal-nginx}[an extensive example] in the `nginx` project wiki which
+goes through a lot of the required details. Many applications will mostly
+work with only the <<Handling other URLs with PHP>> changes suggested above,
+but some may require further configuration.
+
+If you need specific advice for a particular application, feel free to email
+mailto:helpdesk@eait.uq.edu.au[EAIT helpdesk] and ask -- we'll try to help you
+out as much as we can.
+
+==== PHP error logging
+
+When PHP scripts encounter errors or use the `error_log()` function, the output
+will be emitted to a log file.
+
+In the `webproject` image, we send the PHP error log output into the file
+`/var/log/php/errors.log`. You should check this file if your PHP code is
+experiencing problems.
+
+
+
+=== Python/uwsgi (Django, Flask etc)
+
+For running Python web applications, including those based on frameworks like
+{uri-django}[Django] or {uri-flask}[Flask], we will use `uwsgi`, a WSGI server
+for Python.
+
+The WSGI interface is a generic API for web server applications in Python where
+the different "server" software options may be used interchangeably.
+
+Other alternative WSGI servers such as GUnicorn can be used instead, but you
+will have to set them up yourself (the image does not come with GUnicorn or any
+others pre-installed).
+
+==== Simple WSGI example
+
+We will start with a very simple example program which you will find provided
+in the `webproject` image in the file `/var/www/uwsgi/myapp.py`:
+
+[source,python]
+....
+def application(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/html')])
+    resp = "<h1 style='color:blue'>Hello There!</h1>"
+    return [resp.encode('utf-8')]
+....
+
+This is a very simple program which just responds to every possible request
+with blue text reading "Hello There!".
+
+If we have a quick look at the `uwsgi` configuration file, we can see it is
+already configured to use this Python program:
+
+[source,ini]
+....
+[uwsgi]
+module = myapp
+chdir = /var/www/uwsgi
+....
+
+The `module` field here refers to the Python module name to load, and `chdir`
+makes `uwsgi` change to that directory before loading it.
+
+If we enable the `uwsgi` framework in `webprojctl`:
+
+[source,shell-session]
+....
+root@foobaz:~# webprojctl enable uwsgi
+== enabling uwsgi...
+Created symlink from /etc/nginx/frameworks-available/uwsgi.conf to /etc/nginx/frameworks-enabled/uwsgi.conf
+Reloading nginx configuration
+Enabling systemd unit uwsgi
+Created symlink from /etc/systemd/system/multi-user.target.wants/uwsgi.service to /etc/systemd/system/uwsgi.service.
+
+REMINDERS:
+ * Place your python files in /var/www/uwsgi
+ * uwsgi will load myapp.py in that directory -- to change this edit /etc/uwsgi/uwsgi.ini
+....
+
+Then if we visit the main page of our zone's website in a browser, we will see
+the output of the Python code appear.
+
+Note that if you make changes to the Python code, you will need to restart
+`uwsgi`, which you can do using the command `systemctl restart uwsgi`:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl restart uwsgi
+....
+
+You can see any logged output from your application that wasn't sent to the
+client in the file `/var/log/uwsgi/error.log`. This includes stack traces from
+Python when requests unexpectedly throw an error, so you should check here first
+if things aren't working.
+
+==== Using a `virtualenv` environment
+
+For our next example, we will set up a `virtualenv` environment and install
+{uri-flask}[Flask], a simple microframework which doesn't require many
+dependencies.
+
+First, we set up the environment:
+
+[source,shell-session]
+....
+root@foobar:~# cd /var/www/uwsgi
+root@foobar:/var/www/uwsgi# virtualenv -p $(which python3.6) .
+Running virtualenv with interpreter /usr/bin/python3.6
+Using base prefix '/usr'
+New python executable in /var/www/uwsgi/bin/python3.6
+Also creating executable in /var/www/uwsgi/bin/python
+Installing setuptools, pkg_resources, pip, wheel...done.
+....
+
+And then activate the new environment and install Flask:
+
+[source,shell-session]
+....
+root@foobaz:/var/www/uwsgi# . ./bin/activate
+(uwsgi)root@foobaz:/var/www/uwsgi# pip install flask
+Collecting flask
+  Downloading Flask-1.1.1-py2.py3-none-any.whl (94 kB)
+     |████████████████████████████████| 94 kB 4.7 MB/s
+Collecting Jinja2>=2.10.1
+  Downloading Jinja2-2.11.1-py2.py3-none-any.whl (126 kB)
+     |████████████████████████████████| 126 kB 25.6 MB/s
+Collecting itsdangerous>=0.24
+  Downloading itsdangerous-1.1.0-py2.py3-none-any.whl (16 kB)
+Collecting click>=5.1
+  Downloading Click-7.0-py2.py3-none-any.whl (81 kB)
+     |████████████████████████████████| 81 kB 14.8 MB/s
+Collecting Werkzeug>=0.15
+  Downloading Werkzeug-0.16.1-py2.py3-none-any.whl (327 kB)
+     |████████████████████████████████| 327 kB 40.6 MB/s
+Collecting MarkupSafe>=0.23
+  Downloading MarkupSafe-1.1.1-cp36-cp36m-manylinux1_x86_64.whl (27 kB)
+Installing collected packages: MarkupSafe, Jinja2, itsdangerous, click, Werkzeug, flask
+Successfully installed Jinja2-2.11.1 MarkupSafe-1.1.1 Werkzeug-0.16.1 click-7.0 flask-1.1.1 itsdangerous-1.1.0
+....
+
+We'll be using the following script as our application, which we will save
+as `/var/www/uwsgi/app2.py`:
+
+[source,python]
+....
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "<span style='color:red'>Hello index world</span>"
+
+@app.route('/foobar')
+def foobar():
+    return "<span style='color:blue'>Hello again!</span>"
+....
+
+This shows off one of the basic features which Flask gives you over writing
+a WSGI application from scratch: routing, which lets us specify which URLs
+cause which functions to run. You can find out more about Flask by
+reading {uri-flask-docs}[its online documentation].
+
+In `/etc/uwsgi/uwsgi.ini` we will need the following configuration:
+
+[source,ini]
+....
+[uwsgi]
+module = app2:app
+chdir = /var/www/uwsgi
+virtualenv = /var/www/uwsgi
+workers = 4
+....
+
+Note the addition of the new `virtualenv =` setting, as well as using
+`app2:app` as the module (rather than `myapp`). This is needed since we named
+the variable `app` which contains the `Flask()` instance above.
+
+After restarting `uwsgi` with `systemctl restart uwsgi`, you should see the new
+red-coloured "Hello index world" message on your website. If you visit the URL
+`/foobar` you should also see a blue "Hello again!" message.
+
+==== Accessing SSO information
+
+The best way to access SSO information from Python is by unpacking the
+`X-KVD-Payload` header generated by `nginx`. There are some further details
+about this and the other pseudo-HTTP headers used for SSO in the section
+<<Unpacking SSO HTTP headers>>, but here we will show a short example:
+
+[source,python]
+....
+from flask import Flask, request
+import json
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    userjson = request.headers['x-kvd-payload']
+    user = json.loads(userjson)
+    return "<span style='color:red'>Hello " + user['user'] + "</span>"
+....
+
+This will display the message "Hello uqfoo" (if your UQ username was `uqfoo`),
+when placed behind any `nginx` SSO ACL which requires a user to be logged in.
+
+If your application needs to be able to dynamically decide whether to ask
+someone to use SSO login or not, you can set the `nginx` SSO ACL to `allow:*`
+and then have your app redirect the user itself:
+
+[source,python]
+....
+from flask import Flask, request, redirect, url_for
+import json
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    if 'x-kvd-payload' in request.headers:
+        userjson = request.headers['x-kvd-payload']
+        user = json.loads(userjson)
+        return "<span style='color:red'>Hello " + user['user'] + "</span>"
+    else:
+        return "<span style='color:red'>Hello world!</span>"
+
+@app.route('/login')
+def login():
+    if not 'x-kvd-payload' in request.headers:
+        url = 'https://api.uqcloud.net/login/https://' + request.headers['host'] + '/login'
+        return redirect(url)
+    userjson = request.headers['x-kvd-payload']
+    user = json.loads(userjson)
+    return "<span style='color:blue'>Hello " + user['user'] + "</span>"
+....
+
+In this last example, the `/` URL handler will optionally use the information
+about the user if they're already logged in, but will not force them to log
+in otherwise. The `/login` URL on the other hand will always force the user to
+log in (by explicitly redirecting them to the SSO login endpoint).
+
+We could also achieve this particular example by using the `nginx` configuration
+to set the ACL for `/login` to `allow:user:*`, but this way the behaviour is
+completely under the control of our Python code -- meaning we can make
+that decision based on more than just the URL.
+
+TIP: `nginx` will ensure that the `X-KVD-Payload` header (and other SSO
+     pseudo-headers) comes only from the SSO module and not from the user
+     request, even when no user is logged in or the ACL is set to `allow:*`.
+     It's safe to simply trust the contents of these headers in your
+     application code.
+
+==== Setting up Django
+
+For Django, we will set up a `virtualenv` environment as we did in the
+previous section.
+
+First, we set up the environment:
+
+[source,shell-session]
+....
+root@foobar:~# cd /var/www/uwsgi
+root@foobar:/var/www/uwsgi# virtualenv -p $(which python3.6) .
+Running virtualenv with interpreter /usr/bin/python3.6
+Using base prefix '/usr'
+New python executable in /var/www/uwsgi/bin/python3.6
+Also creating executable in /var/www/uwsgi/bin/python
+Installing setuptools, pkg_resources, pip, wheel...done.
+....
+
+And then activate the new environment and install Django:
+
+[source,shell-session]
+....
+root@foobaz:/var/www/uwsgi# . ./bin/activate
+(uwsgi)root@foobaz:/var/www/uwsgi# pip install django
+Collecting django
+  Downloading Django-3.0.3-py3-none-any.whl (7.5 MB)
+     |████████████████████████████████| 7.5 MB 22.9 MB/s
+Collecting pytz
+  Downloading pytz-2019.3-py2.py3-none-any.whl (509 kB)
+     |████████████████████████████████| 509 kB 45.1 MB/s
+Collecting sqlparse>=0.2.2
+  Downloading sqlparse-0.3.0-py2.py3-none-any.whl (39 kB)
+Collecting asgiref~=3.2
+  Downloading asgiref-3.2.3-py2.py3-none-any.whl (18 kB)
+Installing collected packages: pytz, sqlparse, asgiref, django
+Successfully installed asgiref-3.2.3 django-3.0.3 pytz-2019.3 sqlparse-0.3.0
+....
+
+Now, to create our Django project, we will use the `django-admin startproject`
+command:
+
+[source,shell-session]
+....
+(uwsgi)root@foobaz:/var/www/uwsgi# django-admin startproject app
+(uwsgi)root@foobaz:/var/www/uwsgi# ls -la app
+drwxr-xr-x 3 root root   4 Feb 11 04:37 .
+drwxr-xr-x 7 root root   7 Feb 11 04:35 ..
+drwxr-xr-x 3 root root   8 Feb 11 04:38 app
+-rwxr-xr-x 1 root root 623 Feb 11 04:32 manage.py
+....
+
+In `/etc/uwsgi/uwsgi.ini` we will need the following configuration:
+
+[source,ini]
+....
+[uwsgi]
+module = app.wsgi:application
+chdir = /var/www/uwsgi/app
+virtualenv = /var/www/uwsgi
+env = DJANGO_SETTINGS_MODULE=app.settings
+workers = 4
+....
+
+And we will also need to set the Django configuration variable `ALLOWED_HOSTS`,
+in `/var/www/uwsgi/app/app/settings.py`:
+
+[source,python]
+....
+...
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = '...'
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+ALLOWED_HOSTS = ['foobar.uqcloud.net'] <1>
+....
+<1> Add your zone's public hostname here (e.g. `foobar.uqcloud.net`).
+
+
+=== Node.js with MongoDB
+
+Node.js applications generally run as an HTTP server on `localhost` on a
+particular port (commonly port `3000`).
+
+The `webproject` image expects your Node.js project to listen on port `8081`
+and to have a Javascript file which can be run as a main module to start it.
+
+A simple example using the {uri-express}[Express] framework (included in the
+image as `/var/www/nodejs/app.js`):
+
+[source,javascript]
+....
+const express = require('express');
+const app = express();
+
+const port = 8081; <1>
+
+app.set('trust proxy', 'loopback'); <2>
+
+app.get('/', function (req, res) {
+    res.send('Hello World');
+})
+
+app.listen(port, () => console.log(`Example app listening on port ${port}!`))
+....
+<1> This port variable (given to `app.listen()` further down) must be set to
+    `8081`.
+<2> This line is needed so that Express knows that it is running behind `nginx`
+    and will trust the remote IP address that `nginx` says the request is from.
+
+We can enable this example by using the command `webprojctl enable nodejs`:
+
+[source,shell-session]
+....
+root@foobar:~# webprojctl enable nodejs
+== enabling nodejs...
+Created symlink from /etc/nginx/frameworks-available/nodejs.conf to /etc/nginx/frameworks-enabled/nodejs.conf
+Reloading nginx configuration
+Enabling systemd unit nodejs
+Created symlink from /etc/systemd/system/multi-user.target.wants/nodejs.service to /etc/systemd/system/nodejs.service.
+
+REMINDERS:
+ * Node.js applications should listen on localhost port 8081
+ * Place your project in /var/www/nodejs
+ * node will load app.js in that directory -- to change this edit /etc/systemd/system/nodejs.service
+....
+
+To add your own code, you can simply edit `app.js`, or even delete the entire
+contents of `/var/www/nodejs` and replace it with whatever you like, as long as
+a file named `app.js` exists and can be run with Node, and it listens on port
+`8081`.
+
+You can use any other framework you like (not just Express), or even no
+framework at all (using the {uri-node-http}[standard library HTTP module]), as
+long as it meets these requirements.
+
+==== Using MongoDB
+
+Let's extend the simple example above to talk to MongoDB. First, we will need
+to enable MongoDB itself:
+
+[source,shell-session]
+....
+root@foobar:~# webprojctl enable mongodb
+== enabling mongodb...
+Enabling systemd unit mongodb
+Synchronizing state of mongodb.service with SysV init with /lib/systemd/systemd-sysv-install...
+Executing /lib/systemd/systemd-sysv-install enable mongodb
+....
+
+Now, we will install the client into our project with `npm`:
+
+[source,shell-session]
+....
+root@foobar:~# cd /var/www/nodejs
+root@foobar:/var/www/nodejs# npm install --save mongodb
+nodejs@1.0.0 /var/www/nodejs
+└─┬ mongodb@3.5.2
+  ├─┬ bl@2.2.0
+  │ └─┬ readable-stream@2.3.7
+  │   ├── core-util-is@1.0.2
+  │   ├── isarray@1.0.0
+  │   ├── process-nextick-args@2.0.1
+  │   ├── string_decoder@1.1.1
+  │   └── util-deprecate@1.0.2
+  ├── bson@1.1.3
+  ├── denque@1.4.1
+  ├─┬ require_optional@1.0.1
+  │ ├── resolve-from@2.0.0
+  │ └── semver@5.7.1
+  └─┬ saslprep@1.0.3
+    └─┬ sparse-bitfield@3.0.3
+      └── memory-pager@1.5.0
+....
+
+Then we will adjust the code in `app.js`:
+
+[source,javascript]
+....
+const express = require('express');
+const app = express();
+
+const MongoClient = require('mongodb').MongoClient;
+
+const port = 8081;
+
+const mongoUrl = 'mongodb://localhost:27017';
+const dbName = 'test';
+
+app.set('trust proxy', 'loopback');
+
+app.get('/', function (req, res) {
+    MongoClient.connect(mongoUrl, function (err, client) {
+        const adminDb = client.db(dbName).admin();
+        adminDb.listDatabases(function (err, dbs) {
+            res.write('<table>');
+            res.write('<tr><th>Name</th><th>Size</th></tr>');
+            dbs.databases.forEach(function (db) {
+                res.write('<tr>');
+                res.write('<td>' + db.name + '</td>');
+                res.write('<td>' + db.sizeOnDisk + '</td>');
+                res.write('</tr>');
+            });
+            res.write('</table>');
+            res.end();
+            client.close();
+        });
+    });
+})
+
+app.listen(port, () => console.log(`Example app listening on port ${port}!`))
+....
+
+And finally, restart the application by using `systemctl restart`:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl restart nodejs
+....
+
+If you visit your zone's website now you should see a table listing all of
+the databases within the MongoDB system (`admin`, `config`, and `local`).
+
+The {uri-mongo-js}[MongoDB JavaScript driver documentation] has many more
+details about how to use MongoDB in JavaScript code effectively.
+
+==== Accessing SSO information
+
+The best way to access SSO information from Node.js is by unpacking the
+`X-KVD-Payload` header generated by `nginx`. There are some further details
+about this and the other pseudo-HTTP headers used for SSO in the section
+<<Unpacking SSO HTTP headers>>, but here we will show a short example:
+
+[source,javascript]
+....
+const express = require('express');
+const app = express();
+
+const port = 8081;
+
+app.set('trust proxy', 'loopback');
+
+app.get('/', function (req, res) {
+    var user = JSON.parse(req.headers['x-kvd-payload']);
+    res.send('Hello ' + user.user);
+})
+
+app.listen(port, () => console.log(`Example app listening on port ${port}!`))
+....
+
+This will display the message "Hello uqfoo" (if your UQ username was `uqfoo`),
+when placed behind any `nginx` SSO ACL which requires a user to be logged in.
+
+=== Ruby/Puma (Sinatra, Rails)
+=== ASP.net
+=== Tomcat and JSP (Java)
+
+
+
+== Setting up web applications from scratch
+
+=== Loadbalancers and handling SSL-unwrapped traffic
+=== Using UQ single sign-on
+
+
+
+== Network services available to zones
+
+One of the advantages of running on UQcloud rather than an external hosting
+service is the ability to make use of internal network services only available
+within UQ.
+
+This section outlines the most commonly used of these and gives some advice
+on using them.
+
+=== UQ single sign-on via fakvd
+
+UQ Single Sign-On allows zones to require UQ users to log in before accessing
+content, and retrieve information about the user who logged in, without
+having to process any of the user's credentials in your zone (so you don't
+have to deal with the security requirements for storing passwords).
+
+The SSO system is designed to work with web browsers, so it is normally used
+to protect websites. It is also possible to use it for logins to e.g. mobile
+applications by directing users to a website which then captures the
+authentication information and stores it.
+
+In the `webproject` image and other images which are based on it, the `nginx`
+service handles all of the mechanics of validating SSO sessions and retrieving
+information about the user. For web applications running behind a `webproject`
+`nginx` server, the user information is available in a number of special HTTP
+headers.
+
+For other types of zones, interaction with the SSO system may have to be
+handled in your application itself. For detailed technical information about
+the protocol you have to implement, please see the section
+<<sso-protocol>>. This section will focus on
+using the SSO information rather than obtaining it.
+
+==== Unpacking SSO HTTP headers
+
+When `nginx` detects a valid SSO session it will set the following headers
+(and it will make sure to clear them out if they are provided by a user request,
+so it's safe to assume they always come from `nginx`):
+
+[options="header"]
+|===
+| Header name       | Format       | Description
+| `X-UQ-User`       | string       | The login name (e.g. `uqfoo` or `s4123456`) of the user
+| `X-UQ-User-Email` | string       | Email address (e.g. `foobar@uq.edu.au`) of the user
+| `X-KVD-Payload`   | json         | All other information about the user
+|===
+
+You can access any of these headers from your web application and use them
+to identify the logged in user.
+
+==== Redirection to login page
+
+If you want your application to selectively require users to use SSO login, you
+may need to redirect users to the login page yourself.
+
+To do this, set the `nginx` ACL for your website to `allow:*` (public access)
+and then when your code has decided that the user needs to log in, take the
+following steps:
+
+ 1. Check for the `X-KVD-Payload` header. If present, the user is logged in.
+    If not present, continue.
+ 2. Redirect the user to `https://api.uqcloud.net/login/<final URL>` where
+    `<final URL>` is replaced by the URL you want the user to come back to
+    after logging in.
+
+For example, if the user is trying to access the page
+`https://foobar.uqcloud.net/articles/71` and the application has decided this
+particular article needs SSO auth to view, it would first check for the
+presence of the `X-KVD-Payload` header in the request. If it was not present,
+it would redirect the user to
+`https://api.uqcloud.net/login/https://foobar.uqcloud.net/articles/71`.
+
+The user will return to your page after logging in and the `X-KVD-Payload` will
+now be set by `nginx`.
+
+==== Payload structure
+
+The SSO "payload" refers to the JSON blob which is located in the
+`X-KVD-Payload` header. An example payload looks like the following:
+
+[source,json]
+....
+{
+  "user": "uqfoobar",
+  "email": "foobar@uq.edu.au",
+  "firstname": "Foo Baz",
+  "lastname": "Bar",
+  "name": "Foo Bar",
+  "ou": "Engineering, Architecture and Information Technology",
+  "title": "Senior Foo",
+  "type": "Staff",
+  "dn": [
+    "CN=Foo Bar - 12345,OU=Engineering Architecture and Information Technology,OU=Executive Dean Engineering Architecture and Info Tech,OU=Provost,OU=Vice-Chancellor,DC=uq,DC=edu,DC=au",
+    "CN=Foo Bar (uqfoobar),OU=EAIT,OU=Accounts,DC=eait,DC=uq,DC=edu,DC=au",
+    "CN=Foo Bar (uqfoobar),OU=Users,OU=Accounts,DC=labs,DC=eait,DC=uq,DC=edu,DC=au"
+  ],
+  "domains": [
+    "eait",
+    "labs",
+    "uq"
+  ],
+  "groups": [
+    "eait:l_building_78",
+    "eait:l_faculty_general",
+    "labs:PaperCutUsers",
+    "labs:soefile",
+    "labs:uusers",
+    "uq:Bel lab logon",
+    "uq:EAIT-AD-All",
+    "uq:EAIT-AD-Faculty",
+    "uq:uqStaff",
+    "uq:uqStaffHosted",
+    "uq:uqStaff_General-General"
+  ]
+}
+....
+
+The following fields are always included in an SSO payload, for any user (staff
+or student):
+
+[options="header"]
+|===
+| Field name          | Description
+| `user`              | UQ username
+| `email`             | Primary email address
+| `firstname`         | First name including any middle names
+| `lastname`          | Surname
+| `name`              | User's preferred name
+| `dn`                | Array of LDAP DNs for the user
+| `domains`           | Array of AD domains the user exists in
+| `groups`            | Array of groups the user is a member of in `domain:group` format
+|===
+
+A few additional fields such as `ou` and `title` may appear on staff users
+only.
+
+NOTE: The `type` field is unfortunately not a reliable way to determine staff vs
+      student users. Relying on it for access control usage may result in
+      incorrect results for some users. Most students will have the value
+      `"???"` in this field.
+
+==== Consent and redaction
+
+To protect the privacy of other students and staff, zones which belong to
+student users who have no employment relationship with the University are
+subject to consent before SSO information is shared with them.
+
+For a zone which is subject to consent, after the login page, users will be
+greeted by a request for consent, which looks like this:
+
+.Example consent screen
+image::consent.png[Screenshot,600]
+
+On this screen, the user asked to give their consent to share SSO login
+information about themselves with the website they're connecting to.
+
+As well as opting to share their information in whole, they can also elect
+to remove certain items from the information, in a process called redaction.
+
+Redaction does not remove any fields from the JSON payload, as this would be
+likely to break applications that were written before redaction was
+implemented. Instead, it replaces them with fixed strings which contain the
+word `redacted`.
+
+For example, here is the same payload we looked at earlier but with all of the
+possible redaction options activated:
+
+[source,json]
+....
+{
+  "user": "uqfoobar",
+  "email": "__redacted__@uq.edu.au",
+  "firstname": "__redacted__",
+  "lastname": "__redacted__",
+  "name": "__redacted__",
+  "ou": "__redacted__",
+  "title": "__redacted__",
+  "type": "Staff",
+  "dn": [
+    "cn=REDACTED, dc=uq, dc=edu, dc=au"
+  ],
+  "domains": [
+    "eait",
+    "labs",
+    "uq"
+  ],
+  "groups": []
+}
+....
+
+As you can see, only the `user` attribute is guaranteed to always be present
+no matter what redaction settings are chosen.
+
+Based on the records from 2019, most users who opt to use the redaction feature
+use it to hide their full name or course enrolment information.
+
+If your application requires certain fields to be present and valid (e.g. the
+e-mail address) and your zone is subject to consent, you should consider
+detecting when the `__redacted__` string is substituted for a real value and
+informing users that further information is required and why you require it.
+
+If you want to prompt users to make a selection again, you can redirect them
+to `https://api.uqcloud.net/auth/consent/<final URL>` in a similar manner to
+the redirection for login.
+
+==== Course enrolment detection
+
+The simplest way to detect whether a visitor is enrolled in a particular course
+is to look in the `groups` field for names of the form `labs:infs1200-2019-1`:
+
+[svgbob]
+....
+
+ +-------+----------+---+------+---+---+
+ | labs: | infs1200 | - | 2019 | - | 1 |
+ +-------+----------+---+------+---+---+
+             ^             ^         ^
+             |             |         |- 1 = "semester 1"
+          "course code"   year       |- 2 = "semester 2"
+                                     '- 3 = "summer semester"
+....
+
+Note that only courses associated with the faculty of EAIT can be reliably
+detected in this manner.
+
+If you need more advanced detection of course enrolment status or information
+about courses outside EAIT, you should consider applying for access to
+<<UQ LDAP for user/group information>>.
+
+=== KRB5 authentication for SSH
+
+Zones are permitted to validate UQ usernames and passwords against the
+Kerberos V realm `KRB5.UQ.EDU.AU`. In the `ubuntu-krb5` and `webproject` images
+and their descendants, this facility is used to allow password login over SSH.
+
+This Kerberos realm has KDCs listed in DNS, so if you are not using one of
+these images and wish to configure KRB5 authentication yourself, you will need
+something similar to this in your `krb5.conf`:
+
+[source,ini]
+....
+[libdefaults]
+	default_realm = KRB5.UQ.EDU.AU
+[domain_realm]
+	uq.edu.au = KRB5.UQ.EDU.AU
+	.uq.edu.au = KRB5.UQ.EDU.AU
+[appdefaults]
+	pam = {
+		minimum_uid = 1000
+		ignore_k5login = true
+	}
+....
+
+We don't currently widely support using the Kerberos V realm for authentication
+to other services with service tickets -- just for password authentication to
+obtain a ticket-granting ticket (TGT). Your zone is not given a host ticket
+or keytab.
+
+=== E-mail submission via EAIT mailhubs
+
+Zones are not generally permitted outgoing traffic to the Internet on ports 25
+or 587 for sending e-mail traffic.
+
+Instead, in order to comply with University policies regarding outgoing e-mail,
+all zones are required to send their e-mail via the EAIT mail hubs, which can be
+reached using the following settings:
+
+Hostname:: `mailhub.eait.uq.edu.au`
+Port:: 25
+TLS/SSL:: StartSSL allowed but not required
+Authentication:: None
+
+Please take note of the fact that authentication is not required, and *do not
+place your UQ username and password in your e-mail sending configuration*.
+
+==== Rate limits
+
+All zones are subject to a default e-mail rate limit of 4 emails per minute.
+
+If you exceed your rate limit, then the mailhubs will reject the mail -- they
+will not queue e-mail on your behalf past your allowed rate. This means that
+whatever software you use for sending e-mail should be capable of queueing
+itself upon rejection or failure by the SMTP server.
+
+If you have to deal with software which is not capable of internal queueing,
+it may be advisable to set up an MTA like Postfix within your zone and
+configuring it to use the EAIT mailhubs as a `relayhost` for all outgoing
+mail.
+
+TIP: If you have need to be regularly sending more than 4 emails/minute for a
+     legitimate purpose (e.g. transactional emails to users of your application)
+     then please contact mailto:helpdesk@eait.uq.edu.au[Helpdesk] to request
+     an increase in your rate limit.
+
+=== Manta object storage
+
+All users of Triton are automatically given access to the Manta object storage
+system as well.
+
+This can be used for storage of bulk data that is too large to fit inside
+your zone, as well as many other purposes.
+
+Your SSH public keys and group accounts are shared between Triton and Manta,
+so you can use Manta directly once your Triton account is set up.
+
+Manta can be thought of conceptually as a giant single directory tree with
+directories named after each user at the top level, followed by pre-set
+"type of storage" directories, and then layers that can be customised by each
+user.
+
+[svgbob]
+....
+ +---+
+ | / |
+ +---+
+   ^    +---------+
+   |----| "uqfoo" |
+   |    +---------+
+   |        ^      +------+
+   |        |------| stor |
+   |        |      +------+
+   |        |
+   |        |      +--------+
+   |        |------| public |
+   |        |      +--------+
+   |        |
+   |        |      +------+
+   |        |------| jobs |
+   |        |      +------+
+   |        |
+   |        |      +---------+
+   |        '------| reports |
+   |               +---------+
+   |    +--------+
+   |----| uqbar  |
+   |    +--------+
+   |        ^      +------+
+   |        |------| stor |
+   |        |      +------+
+   |        |
+   ...      ...
+....
+
+Paths to a particular directory or object/file are laid out similarly to most
+UNIX systems (e.g. `/uqfoo/stor/document.pdf`).
+
+Objects stored in Manta are stored in a distributed, redundant fashion: two
+copies of each object are stored, each on a different server, and the objects
+are spread around randomly so that each server stores roughly an equal amount
+of data. You don't have to deal with any of the details of object placement
+yourself -- Manta handles this automatically.
+
+The Manta commandline tools are pre-installed on `moss.labs.eait.uq.edu.au`
+and `mango.eait.uq.edu.au` alongside the `triton` command. You can also access
+Manta over SFTP and HTTP(s).
+
+For example, to save a copy of the file `/uqfoo/public/image.jpg` which is
+stored in Manta onto our local machine, we could use the command line tools:
+
+[source,shell-session]
+....
+$ mget -O /uqfoo/public/image.jpg
+....
+
+We could also use access via SFTP:
+
+[source,shell-session]
+....
+$ sftp stluc.manta.uqcloud.net
+sftp> get /uqfoo/public/image.jpg
+Fetching /uqfoo/public/image.jpg to image.jpg
+/uqfoo/public/image.jpg                         100% 8293    57.5KB/s   00:00
+....
+
+Or, we could download it over HTTPS using `curl`:
+
+[source,shell-session]
+....
+$ curl -O https://stluc.manta.uqcloud.net/uqfoo/public/image.jpg
+....
+
+The first two of these options require authentication using our SSH keys,
+while the last does not. It works in this particular case because this file
+(`image.jpg`) is located in `/uqfoo/public`. The `public` directory is always
+allowed to be read via HTTPS from anywhere on the Internet.
+
+
+
+=== UQ LDAP for user/group information
+
+For applications run by UQ staff members which require access to more detailed
+data about students than that available in the authentication payload, or for
+other uses (like e.g. listing all current enrolments in a course at once), zones
+may use the central UQ LDAP service.
+
+All zones are allowed access outgoing to this service automatically, but you
+will need to contact the ITS team responsible for the LDAP service to request
+credentials for your application to log in.
+
+To do this, e-mail the mailto:itsupportdesk@its.uq.edu.au[ITS support desk]
+explaining what data you require access to and for what purpose.
+
+
+=== Requesting firewall rule changes
+
+The zones network is subject to a "default deny" or "whitelist" firewall policy
+for both incoming and outgoing traffic. This means that for any network traffic
+to be allowed to or from a zone, there must be a rule in place allowing it --
+if there is no rule, the traffic is blocked.
+
+Outgoing traffic allowed from all zones includes:
+
+ * DNS (will be transparently redirected to EAIT recursive nameservers)
+ * SSH, HTTP and HTTPS to any destination
+ * NTP to `ntp.eait.uq.edu.au`
+ * SMTP (on ports 25 and 587) to `mailhub.eait.uq.edu.au`
+ * Git protocol (i.e. `git://` URLs, TCP port 9418) to `source.eait.uq.edu.au`,
+   GitHub, BitBucket
+ * KVD protocol (UDP port 1080) to FaKVD for SSO
+ * LDAP and LDAPS to `ldap.uq.edu.au`
+ * KRB5 UDP ports to KDCs for the realm `KRB5.UQ.EDU.AU`
+
+Incoming traffic allowed to private IP zones (on the `zones` network) is limited
+to SSH only (from any UQ network).
+
+For zones on public IP address (`zones-public`), the following incoming traffic
+is allowed from any source on the Internet:
+
+ * TCP port 22 (for SSH)
+ * TCP ports 80 and 443 (for HTTP/HTTPS)
+ * TCP port 3389 (for MS RDP)
+
+Additional incoming and outgoing rules can be added for specific zones, services
+and other endpoints. Generally, however, incoming rules will only be added for
+non-HTTP services (we expect you to multiplex other HTTP traffic over your
+standard ports) from/to specific remote hosts. Outgoing rules are usually
+allowed to be broader than incoming rules.
+
+To request additional firewall rules to be added for you zone, contact
+mailto:helpdesk@eait.uq.edu.au[the EAIT IT helpdesk] and include the following
+information in your e-mail:
+
+ * The name of your zone, in the full `account-zonename` format
+ * The exact protocols and port numbers required (e.g. TCP port 9898)
+ * The service to be run on it (why it's required)
+ * Information about remote hosts that are expected to connect to it or
+   be connected to (DNS names, IP addresses, etc).
+
+
+
+
+== Group accounts and managing access
+
+As well as "individual" accounts in the UQCloud Triton system, which each
+belong to a specific person, there are also "group" accounts.
+
+A group account can provision and own zones, have networks or private images,
+and generally can do anything that an individual account can do. The key
+differences are:
+
+ * Group accounts can be used by more than one person;
+ * Group accounts are not necessarily terminated when the people who created
+   them leave the University; and
+ * Group accounts may be given a quota higher than the regular limit (8 GB) for
+   individual accounts.
+
+The people who manage a group account are generally referred to as the account's
+"administrators". A group administrator can take actions on behalf of the
+group account, and they can also manage the list of administrators for the
+group (adding/removing other administrators).
+
+We generally recommend that anyone who is running a production service on zones
+which is likely to be a long-term asset to the University (whether for teaching
+or research) should consider running it under a group account so that it is
+not tied to a single staff member.
+
+=== Requesting a group account and what to expect
+
+Decisions regarding requests for group accounts and their final quota are
+made on a case-by-case basis. In general, though, these are some examples of the
+types of entities which are normally entitled to a group account:
+
+ * Research groups, labs, departments or other organisational units within the
+   faculty of EAIT;
+ * Courses taught by faculty of EAIT staff (even if not "owned" entirely by
+   EAIT);
+ * Projects which are run or developed by staff within the faculty of EAIT; and
+ * Student societies associated with EAIT.
+
+If your team or group doesn't sound like one of these, it might still be
+eligible, so feel free to apply anyway to see what is possible.
+
+Application is made by emailing the mailto:helpdesk@eait.uq.edu.au[EAIT helpdesk]
+with a request containing the following information:
+
+ * What entity the group account should be associated with (the name and details
+   of your group/team, key staff members involved etc);
+ * A short alphanumeric name you would like for the account;
+ * A list of UQ usernames for the initial set of administrators; and
+ * Whether students (who are not also members of staff, e.g. tutors) will be
+   allowed to provision and control zones under the account (this is needed
+   in order to set the SSO "consent" flag for the account, see
+   <<Consent and redaction>>).
+
+=== Using group accounts with "triton"
+
+Once a group account has been set up and you are an administrator on it, we
+can begin to use it immediately.
+
+We use the option `--act-as=<name>` to the `triton` command in order to act on
+behalf of a group account.
+
+For example, for a group account named `itig`:
+
+[source,shell-session]
+....
+$ triton --act-as=itig inst ls
+SHORTID   NAME             IMG                    STATE    FLAGS  AGE
+b1fdee14  coursemgr        webproject@2.1.0       running  -      3y
+75a1cba7  datahub          base-64-lts@17.4.0     running  -      1y
+110fbb64  coursemgr-dev    webproject@2.3.0       running  -      1y
+....
+
+Note that the option should go before any subcommands (since it's an option to
+the whole `triton` command, not a specific operation).
+
+This approach will work for any command supported by the `triton` tool.
+
+=== Managing access to group accounts
+
+You can view the current list of administrators for a group account by
+running the command `triton --act-as=group rbac roles`:
+
+[source,shell-session]
+....
+$ triton --act-as=itig rbac roles
+NAME           POLICIES  MEMBERS
+administrator  *         uqawil16,uqjmatt6,uqmemer1,uqrtayl2
+....
+
+To edit the list, use the command
+`triton --act-as=group rbac role administrator --edit`:
+
+[source,shell-session]
+....
+$ triton --act-as=itig rbac role administrator --edit
+name:    administrator
+members:
+  - type:    account
+    default: true
+    id:      783fcb12-cfb4-489e-ab1c-fb999661f7c5
+    login:   uqawil16
+  - type:    account
+    default: true
+    id:      985d8d94-b987-4e17-bad6-cc49d27a36d5
+    login:   uqjmatt6
+  - type:    account
+    default: true
+    id:      9b17eb72-6537-4610-a95e-02d88c63b59d
+    login:   uqmemer1
+  - type:    account
+    default: true
+    id:      ba9fe94c-eb64-42b9-983d-64f38990b1ae
+    login:   uqrtayl2
+policies:
+....
+
+This command will start a text editor (you can choose which one by changing
+the environment variable `$EDITOR`) with the contents of the administrator role
+configuration as exemplified above.
+
+To modify it, simply save and exit your editor, and then the `triton` command
+will upload your changes to the system.
+
+The format of the role configuration is a subset of {uri-yaml}[YAML]. If you're
+not too confident with it, it's generally easiest to just copy from an existing
+example and modify it.
+
+To add a new member to the administrator role, you should add another stanza
+like the existing ones shown above (below `members:`), for example:
+
+[source,yaml]
+....
+  - type:    account <1>
+    default: true <2>
+    login:   uqfoobar
+....
+<1> Use `type: account` for any regular UQ account.
+<2> You should always set `default: true` on new members unless you're really
+    sure you want otherwise -- see <<rbac>>
+    for further information.
+
+NOTE: When adding a new member, you do *not* need to include the `id` field --
+      the system will automatically retrieve it based on the `login`.
+
+You can also remove members by simply deleting their section in the YAML. Don't
+remove the `name:` line or the beginning of the `members:` list line, or else
+the YAML will be invalid and will not be saved.
+
+Let's say we want to remove `uqmemer1` and add `uqfoobar` to the members list
+above -- then we would edit the YAML to contain:
+
+[source,yaml]
+....
+name:    administrator
+members:
+  - type:    account
+    default: true
+    id:      783fcb12-cfb4-489e-ab1c-fb999661f7c5
+    login:   uqawil16
+  - type:    account
+    default: true
+    id:      985d8d94-b987-4e17-bad6-cc49d27a36d5
+    login:   uqjmatt6
+  - type:    account
+    default: true
+    id:      ba9fe94c-eb64-42b9-983d-64f38990b1ae
+    login:   uqrtayl2
+  - type:    account
+    default: true
+    login:   uqfoobar
+policies:
+....
+
+After saving and exiting our text editor, `triton` will then update the
+account's administrators for us, and if we check in `triton rbac roles` again:
+
+[source,shell-session]
+....
+$ triton --act-as=itig rbac roles
+NAME           POLICIES  MEMBERS
+administrator  *         uqawil16,uqjmatt6,uqrtayl2,uqfoobar
+....
+
+==== Common errors
+
+The most common error you might receive while updating the members of the
+administrator role on your group account is the following:
+
+[source,shell-session]
+....
+$ triton --act-as=group rbac role administrator --edit
+...
+Error updating role with your changes: InvalidArgumentError: Invalid account: uqfoobar
+Press <Enter> to re-edit, Ctrl+C to abort.
+....
+
+This error is indicating that no current Triton account with the username
+`uqfoobar` currently exists. This might be because of a typo in the name
+of the account, or the user might not yet exist in Triton.
+
+In order to be able to add a user to the administrators list for an account,
+they must have already logged into Triton once before so that their account
+is fully created. They can do this by following the steps in the section
+<<Logging in and installing tools>> (running `sdc-setup` and adding keys).
+
+
+
+== Coursemgr and teaching with zones
+
+When using zones for coursework teaching, it's often desirable to manage them
+in bulk and keep the set of zones running up to date with course enrolments.
+
+UQCloud includes a tool specifically for managing this usecase,
+named "Coursemgr". This section will explain how Coursemgr works, what it can
+do, and how to get access for your course.
+
+=== Student privacy and zones
+
+When planning to use zones for teaching, it's important to consider the UQ
+policies surrounding student privacy and the use of IT assets.
+
+In general, University IT systems are obligated to withhold all information
+about students from one another and from the public unless express consent has
+been given for disclosure.
+
+This means that student full names, the fact that a student is enrolled in a
+certain course, and even the existence of other students is something which
+IT systems should be designed not to share with anybody where possible.
+
+One particular area where this comes up with respect to courses using zones is
+in zone naming. If a course creates zones named, for example, `infs1234-s4xxxxx`
+for each student who is enrolled, this enables anybody on the Internet
+(including other students) to determine whether a particular student is enrolled
+in the course or not, by doing a DNS query for `infs1234-s4xxxxx.uqcloud.net`.
+
+The DNS (by design) does not allow UQ to determine accurately whether names have
+been queried or not or by whom, nor does it allow UQ to limit the rate of
+"guesses" to try to slow down this kind of enumeration of enrolments. As a
+result, it is strongly recommended to avoid including student numbers, student
+names, or any identifiable information about a student in the name of a zone.
+Instead, if there is no other meaningful name for a zone (e.g. because it's just
+a particular student's personal instance), a random identifier should be used.
+
+When sharing zones between a group of students, clear communication must be made
+to all of the students involved about the nature of the zone as a shared
+resource, and the fact that they cannot expect privacy from the other students
+they are sharing it with (including in their home directories on the zone, which
+are all accessible to `root`).
+
+All activity that takes place on zones, whether it be running commands,
+making network connections, or writing files, will also be audited and recorded
+by the system and can be used for support purposes or incident response. This
+too, should be clearly communicated by courses which require the use of zones
+for teaching activities.
+
+=== Student zones in course accounts
+=== Coursemgr settings (images, packages, etc)
+=== Team projects
+
+
+
+[appendix]
+== Fabric networks and public IP addresses [[fabrics]]
+
+=== Network and application design
+=== Creating and managing fabric networks
+=== Placing zones on fabric networks
+=== Using "zones-public" for public IP addresses
+
+
+[appendix]
+== Role-based access control and sub-users [[rbac]]
+
+=== Accounts, sub-users and roles
+=== Writing aperture rules
+
+
+[appendix]
+== High-availability clustering
+
+=== DNS for zones
+=== Managing CNS metadata
+
+
+[appendix]
+== Native zones and pkgsrc [[pkgsrc]]
+
+
+[appendix]
+== Performance analysis and debugging in zones
+
+
+[appendix]
+== SSO protocol (KVD/FaKVD) [[sso-protocol]]
