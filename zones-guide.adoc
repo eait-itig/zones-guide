@@ -808,12 +808,28 @@ TIP: Changes made to NICs will not show up within the zone immediately, as it
 
 === Errors and mistakes
 
-TODO: some common errors while creating/managing zones
+TODO: more errors here
+
+==== Duplicate alias
+
+If you see this error when trying to create a new zone:
 
 ....
 triton instance create: error: error creating instance
     alias: Duplicate: Already exists for this owner_uuid: Invalid VM parameters: Invalid machine name
 ....
+
+Then you already have another zone in your account with the same name ("alias").
+You should run `triton inst list` and have a look at the zones on your account
+to try to figure out why the name is already in use.
+
+You can end up with this error if you start a provision operation for a new zone
+but then get disconnected from the Internet part-way through -- your local
+`triton` command might not receive confirmation that the zone is being created,
+but Triton has still acted on the request. In this case it's generally safe to
+use the zone as-is and not re-create it -- the `triton` tool sets all of the
+settings and metadata for the zone in the initial request, so it will all be
+there if the zone was created at all.
 
 === Destroying zones
 
