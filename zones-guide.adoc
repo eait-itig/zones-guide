@@ -2621,6 +2621,24 @@ TIP: If you have need to be regularly sending more than 4 emails/minute for a
      then please contact mailto:helpdesk@eait.uq.edu.au[Helpdesk] to request
      an increase in your rate limit.
 
+==== Sender domains and SPF
+
+We recommend that you send email from an email address of the form:
+`noreply@zonename.zones.eait.uq.edu.au`. The EAIT mailhubs will only accept
+mail with certain sender addresses, and some domains will be rejected outright
+-- for example, sending email from a zone with a sender address set to a
+student email like `s4xxxx@student.uq.edu.au` or `name.lastname@uq.net.au`
+will be rejected.
+
+If you want to add the EAIT mailhubs to an SPF record on a domain so that they
+can send email on its behalf, you should include `_spf.uq.edu.au`, using a
+record like the following:
+
+....
+domain.     IN    TXT       "v=spf1 include:_spf.uq.edu.au ~all"
+....
+
+
 === Manta object storage
 
 All users of Triton are automatically given access to the Manta object storage
