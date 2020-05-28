@@ -1027,11 +1027,194 @@ An equivalent to this feature is also available {uri-winscp-tunnel}[in WinSCP].
 
 === When things go wrong
 
-TODO: failed SSH login due to being off UQ network (timeout)
+==== SSH from outside UQ network
 
-TODO: failed login due to out of memory or out of disk
+If you try to SSH to a zone and receive errors like the following:
+
+[source,shell-session]
+....
+$ ssh foobar.zones.eait.uq.edu.au
+ssh: connect to host foobar.zones.eait.uq.edu.au port 22: No route to host
+
+$ ssh foobar.zones.eait.uq.edu.au
+ssh: connect to host 172.23.80.123 port 22: Connection timed out
+....
+
+Then you most likely are not on the UQ network. As noted in the section
+<<From outside the UQ network>>, you will need to use a VPN or proxy your
+SSH connection in order to access zones via SSH from outside the UQ network.
+
+You can also use the `triton inst exec` method for access to zones from outside
+if you wish.
+
+==== Out of disk space
+
+If you try to SSH to a zone as a normal user and it refuses your login even
+with the correct password, but login as `root` or `triton inst exec` work,
+it's likely worth checking for available disk space:
+
+[source,shell-session]
+....
+$ ssh uqawil16@foobar.zones
+uqawil16@foobar.zones's password:
+Permission denied, please try again.
+uqawil16@foobar.zones's password: ^C
+
+$ ssh root@foobar.zones
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 4.3.0 x86_64)
+Last login: Thu May 28 00:01:13 2020 from 130.102.79.52
+root@foobar:~# df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/zfsds0      21G   21G     0 100% /
+
+$ triton inst exec foobar -- df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/zfsds0      21G   21G     0 100% /
+....
+
+In some situations (e.g. with native brand zones), the situation may be worse
+than this and root logins will also be refused.
+
+If you have available quota, the easiest way to figure out what has happened
+is generally to resize the zone to a larger package (see <<Changing package>>)
+and then use the `du` command to figure out what files and directories are
+consuming space:
+
+[source,shell-session]
+....
+$ triton inst exec foobar -- bash --login
+root@foobar:/# du -ks * | sort -n
+1       boot
+1       lib64
+1       media
+1       mnt
+1       srv
+4       sys
+31      dev
+70      proc
+204     run
+1914    home
+2242    etc
+3220    sbin
+4773    system
+6415    bin
+8863    tmp
+24056   lib
+102064  opt
+307533  var
+976232  root
+1871127 usr
+2350150 native
+17735460        test
+69293929        checkpoints
+....
+
+It's worth noting that the space used by the `checkpoints` directory is actually
+vastly less than `du` reports (if you compare this to the used space in `df`
+you will notice this). In this case the space is being used by the `test`
+directory.
+
+If we delete the `test` directory:
+
+[source,shell-session]
+....
+root@foobar:/# df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/zfsds0     7.7G  3.2G  4.6G  41% /
+
+$ ssh uqawil16@foobar.zones
+uqawil16@foobar.zones password:
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 4.3.0 x86_64)
+uqawil16@foobar:~$
+....
+
+Note that the used space of the zone may not immediately return to the amount
+you expect if the large files or directories were incorporated into a backup
+snapshot. If space usage remains too high even after deleting data, you can
+either wait (the backup snapshots will be rotated out automatically), or else
+contact mailto:helpdesk@eait.uq.edu.au[helpdesk], and they will assist by
+forcing the backup snapshots to rotate out earlier.
+
+==== Out of memory
+
+If you try to SSH to a zone and it closes the connection immediately like this:
+
+[source,shell-session]
+....
+$ ssh root@foobar.zones
+Connection closed by 172.23.80.123 port 22
+....
+
+Your zone may be hitting its memory limits (specifically, the swap cap, which
+will prevent `sshd` from creating new processes). You can confirm by trying
+a basic command with `triton inst exec` as well:
+
+[source,shell-session]
+....
+$ triton inst exec foobar id
+$
+
+$ triton inst exec foobar id
+/usr/bin/id: cannot fork [Not enough space]
+....
+
+You may or may not receive the second message, depending on how bad the
+situation is.
+
+If you have available quota, the easiest way to figure out what has happened
+is generally to resize the zone to a larger package (see <<Changing package>>)
+and then use the `zonememstat` and `prstat` commands to diagnose which process
+is using up memory:
+
+[source,shell-session]
+....
+$ triton inst exec foobar -- bash --login
+root@foobar:/# zonememstat
+                                 ZONE  RSS(MB)  CAP(MB)  NOVER  POUT(MB) SWAP%
+ 8bd7e04a-ca38-c927-9be8-e53a6ffc8343     1935     1024     19     17573 52.612
+root@foobar:/# prstat -s rss 1 1 | cat
+   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU PROCESS/NLWP
+445766 root     2082M 1997M sleep    1    0   0:00:05 1.1% python2.7/1
+444872 root       21M 4112K sleep   59    0   0:00:00 0.0% bash/1
+424960 root       96M 3384K sleep   57    0   0:00:00 0.0% sshd/1
+425007 root       23M 3336K sleep   59    0   0:00:00 0.0% bash/1
+ 40225 root       46M 3228K sleep    1    0   0:00:37 0.0% systemd-journal/1
+445954 root     3732K 3044K cpu9    59    0   0:00:00 0.0% prstat/1
+992585 root       30M 3008K sleep    9    0   0:00:00 0.0% atd/1
+ 41621 syslog     50M 2988K sleep   59    0   0:00:06 0.0% rsyslogd/4
+ 29074 root       42M 2892K sleep    1    0   0:00:34 0.0% systemd/1
+ 41613 root       33M 2780K sleep   59    0   0:00:20 0.0% cron/1
+ 42077 root       93M 2756K sleep   59    0   0:00:00 0.0% networkd-dispat/2
+ 41618 www-data   44M 2756K sleep   59    0   0:02:18 0.0% uwsgi/1
+ 42205 root      109M 2744K sleep   57    0   0:00:00 0.0% unattended-upgr/2
+ 45424 root       69M 2712K sleep   59    0   0:00:00 0.0% sshd/1
+ 42071 root       23M 2688K sleep   59    0   0:00:05 0.0% systemd-logind/1
+Total: 27 processes, 34 lwps, load averages: 0.01, 0.00, 0.00
+....
+
+In the example above we can clearly confirm that we're over our memory cap and
+have been swapping, since in `zonememstat` the `CAP(MB)` column exceeds
+`RSS(MB)` and `NOVER` (number of times our pages have been forced out into
+swap) is greater than zero.
+
+In the `prstat` output we can clearly see that a `python2.7` process is to
+blame (with pid `445766`).
+
+If you experience these symptoms but don't have enough quota to resize in
+order to diagnose it, or you're not sure about the results, contact
+mailto:helpdesk@eait.uq.edu.au[Helpdesk] and ask them to help you confirm the
+situation.
+
+NOTE: After you have resolved the situation causing the memory exhaustion, you
+should reboot your zone -- when zones run out of memory sometimes system
+services and important processes will be broken or swapped out and very slow.
+A reboot will help to prevent any further knock-on issues later.
+
+==== No DNS entry
 
 TODO: failed login due to no DNS entry (provisioned on fabric only)
+
+==== SSH daemon not running
 
 TODO: failed login due to disabled/crashed/badly configured SSH daemon
 
