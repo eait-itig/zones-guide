@@ -2505,7 +2505,243 @@ when placed behind any `nginx` SSO ACL which requires a user to be logged in.
 
 == Setting up web applications from scratch
 
-=== Loadbalancers and handling SSL-unwrapped traffic
+As well as running web applications using the `webproject` image, we can also
+set them up "from scratch" on the `ubuntu-krb5` or base OS images.
+
+When doing this there are a number of important issues we have to consider
+and deal with carefully in our configuration.
+
+First, when the EAIT loadbalancers direct HTTP requests to your zone, they make
+a number of changes to the request. They inject some additional headers (e.g.
+`X-Real-Ip` so you can see the actual client IP address), and they also strip
+TLS/SSL from HTTPS requests, relaying them as plain HTTP.
+
+This means that your zone has to be configured to listen for plain HTTP requests
+without TLS/SSL on both ports 80 and 443. You should also configure your web
+server to trust and process the headers such as `X-Real-Ip` where possible, to
+keep your logs accurate.
+
+Secondly, if you want to make use of UQ single sign-on within your web
+application, you will need to set all of the components for this up yourself
+as they aren't pre-installed in the image (like they would be in `webproject`).
+
+If you don't want to use `nginx` as your web server, you may have to deal with
+all interaction with the SSO system in your own application code, as well.
+
+=== Using Apache and mod_php
+
+To illustrate these points, we will set up Apache and `mod_php` on the
+`ubuntu-krb5` image and configure it.
+
+First, we'll install the necessary software using `apt-get`:
+
+[source,shell-session]
+....
+root@foobar:~# apt-get install apache2 libapache2-mod-php
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following additional packages will be installed:
+  apache2-bin apache2-data apache2-utils libapache2-mod-php7.2 libapr1 libaprutil1 libaprutil1-dbd-sqlite3 libaprutil1-ldap
+  libgdbm-compat4 liblua5.2-0 libperl5.26 libsodium23 perl perl-modules-5.26 php-common php7.2-cli php7.2-common php7.2-json
+  php7.2-opcache php7.2-readline psmisc ssl-cert
+The following NEW packages will be installed:
+  apache2 apache2-bin apache2-data apache2-utils libapache2-mod-php libapache2-mod-php7.2 libapr1 libaprutil1 libaprutil1-dbd-sqlite3
+  libaprutil1-ldap libgdbm-compat4 liblua5.2-0 libperl5.26 libsodium23 perl perl-modules-5.26 php-common php7.2-cli php7.2-common
+  php7.2-json php7.2-opcache php7.2-readline psmisc ssl-cert
+0 upgraded, 24 newly installed, 0 to remove and 15 not upgraded.
+Need to get 12.3 MB of archives.
+After this operation, 66.2 MB of additional disk space will be used.
+Do you want to continue? [Y/n] Y
+...
+info: Executing deferred 'a2enmod php7.2' for package libapache2-mod-php7.2
+Enabling module php7.2.
+Created symlink from /etc/systemd/system/multi-user.target.wants/apache2.service to /lib/systemd/system/apache2.service.
+Created symlink from /etc/systemd/system/multi-user.target.wants/apache-htcacheclean.service to /lib/systemd/system/apache-htcacheclean.service.
+Processing triggers for systemd (229-4ubuntu21.4) ...
+Processing triggers for man-db (2.8.3-2ubuntu0.1) ...
+Processing triggers for libc-bin (2.27-3ubuntu1) ...
+root@foobar:~#
+....
+
+The installation should have already enabled and started the `apache2` systemd
+service for us:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl status apache2
+● apache2.service - The Apache HTTP Server
+   Loaded: loaded (/lib/systemd/system/apache2.service; enabled; vendor preset: enabled)
+  Drop-In: /lib/systemd/system/apache2.service.d
+           └─apache2-systemd.conf
+   Active: active (running) since Wed 2020-06-10 06:01:02 UTC; 8min ago
+ Main PID: 256067 (apache2)
+   CGroup: /system.slice/apache2.service
+           ├─256067 /usr/sbin/apache2 -k start
+....
+
+If we visit http://foobar.uqcloud.net in a web browser now, we will see the
+Ubuntu Apache2 welcome page. However, if we try to visit
+https://foobar.uqcloud.net we will receive a "502 Bad Gateway" error from the
+EAIT loadbalancers.
+
+In order to serve HTTPS traffic, we will have to enable a second *non-SSL*
+listener on port 443.
+
+To do this, we need to edit the file `/etc/apache2/ports.conf`. The file
+currently contains:
+
+[source,apache]
+....
+# If you just change the port or add more ports here, you will likely also
+# have to change the VirtualHost statement in
+# /etc/apache2/sites-enabled/000-default.conf
+
+Listen 80
+
+<IfModule ssl_module>
+        Listen 443
+</IfModule>
+....
+
+What we need to do is remove the `IfModule ssl_module` directives around
+`Listen 443`, so that it applies even without SSL enabled:
+
+[source,apache]
+....
+# ...
+
+Listen 80
+Listen 443
+....
+
+NOTE: Don't enable the Apache SSL module at any point on a regular
+(non-public-IP) zone. It won't work, and will cause errors accessing your
+zone over HTTPS.
+
+Now we can reload the Apache config using `systemctl reload apache2`:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl reload apache2
+....
+
+Now we will see the welcome page at https://foobar.uqcloud.net as well. However,
+if we look at the Apache access logs in `/var/log/apache2/access.log`, we can
+see that the client IP addresses are incorrect:
+
+....
+172.23.83.251 - - [10/Jun/2020:06:09:50 +0000] "GET / HTTP/1.1" 200 3440 "-" "...."
+172.23.83.251 - - [10/Jun/2020:06:09:50 +0000] "GET /icons/ubuntu-logo.png HTTP/1.1" 200 3587 "http://foobar.uqcloud.net/" "..."
+172.23.83.251 - - [10/Jun/2020:06:09:50 +0000] "GET /favicon.ico HTTP/1.1" 404 460 "-" "..."
+....
+
+All of our requests look as though they are coming from `172.23.83.251` or
+an address adjacent to it -- these are the IP addresses of the EAIT
+loadbalancers. To make our logs show the true client IP addresses, we will
+need to enable `mod_remoteip` and configure it:
+
+[source,shell-session]
+....
+root@foobar:~# a2enmod remoteip
+Enabling module remoteip.
+To activate the new configuration, you need to run:
+  systemctl restart apache2
+....
+
+Next, create the file `/etc/apache2/conf-available/remoteip-eait.conf`:
+
+[source,apache]
+....
+# Allow RemoteIP headers from the EAIT loadbalancers
+RemoteIPHeader X-Real-Ip
+RemoteIPTrustedProxy 172.23.83.250/31
+....
+
+Then enable this configuration file:
+
+[source,shell-session]
+....
+root@foobar:~# a2enconf remoteip-eait
+Enabling conf remoteip-eait.
+To activate the new configuration, you need to run:
+  systemctl reload apache2
+....
+
+We will also need to edit `/etc/apache2/apache2.conf`, where we need to look
+for these lines:
+
+[source,apache]
+....
+LogFormat "%v:%p %h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" vhost_combined
+LogFormat "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" combined
+LogFormat "%h %l %u %t \"%r\" %>s %O" common
+LogFormat "%{Referer}i -> %U" referer
+LogFormat "%{User-agent}i" agent
+....
+
+Change `%h` here to `%a` (as `%a` is where the `mod_remoteip` module places the
+real client address). The final section should look like this:
+
+[source,apache]
+....
+LogFormat "%v:%p %a %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" vhost_combined
+LogFormat "%a %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" combined
+LogFormat "%a %l %u %t \"%r\" %>s %O" common
+LogFormat "%{Referer}i -> %U" referer
+LogFormat "%{User-agent}i" agent
+....
+
+Then we can restart Apache:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl restart apache2
+....
+
+Finally, as hinted at in the `ports.conf` comments, we should adjust our
+default virtual host to use port 443. If we want to make the configuration work
+like the default `webproject` configuration (where users are redirected from
+plain HTTP to HTTPS automatically), we should edit
+`/etc/apache2/sites-enabled/000-default.conf` to look like this:
+
+[source,apache]
+....
+<VirtualHost *:443>
+        ServerName foobar.uqcloud.net
+
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/html
+
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+
+<VirtualHost *:80>
+        ServerName foobar.uqcloud.net
+
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/html
+
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+        Redirect permanent / https://foobar.uqcloud.net
+</VirtualHost>
+....
+
+And then enable the `mod_rewrite` module and restart Apache:
+
+[source,shell-session]
+....
+root@foobar:~# a2enmod rewrite
+Enabling module rewrite.
+To activate the new configuration, you need to run:
+  systemctl restart apache2
+
+root@foobar:~# systemctl restart apache2
+....
+
 === Using UQ single sign-on
 
 
