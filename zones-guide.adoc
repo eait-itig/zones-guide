@@ -1193,8 +1193,8 @@ Total: 27 processes, 34 lwps, load averages: 0.01, 0.00, 0.00
 ....
 
 In the example above we can clearly confirm that we're over our memory cap and
-have been swapping, since in `zonememstat` the `CAP(MB)` column exceeds
-`RSS(MB)` and `NOVER` (number of times our pages have been forced out into
+have been swapping, since in `zonememstat` the `RSS(MB)` column exceeds
+`CAP(MB)` and `NOVER` (number of times our pages have been forced out into
 swap) is greater than zero.
 
 In the `prstat` output we can clearly see that a `python2.7` process is to
