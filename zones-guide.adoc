@@ -2513,12 +2513,12 @@ and deal with carefully in our configuration.
 
 First, when the EAIT loadbalancers direct HTTP requests to your zone, they make
 a number of changes to the request. They inject some additional headers (e.g.
-`X-Real-Ip` so you can see the actual client IP address), and they also strip
+`X-Real-IP` so you can see the actual client IP address), and they also strip
 TLS/SSL from HTTPS requests, relaying them as plain HTTP.
 
 This means that your zone has to be configured to listen for plain HTTP requests
 without TLS/SSL on both ports 80 and 443. You should also configure your web
-server to trust and process the headers such as `X-Real-Ip` where possible, to
+server to trust and process the headers such as `X-Real-IP` where possible, to
 keep your logs accurate.
 
 Secondly, if you want to make use of UQ single sign-on within your web
@@ -2654,7 +2654,7 @@ Next, create the file `/etc/apache2/conf-available/remoteip-eait.conf`:
 [source,apache]
 ....
 # Allow RemoteIP headers from the EAIT loadbalancers
-RemoteIPHeader X-Real-Ip
+RemoteIPHeader X-Real-IP
 RemoteIPTrustedProxy 172.23.83.250/31
 ....
 
