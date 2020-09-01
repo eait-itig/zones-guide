@@ -27,6 +27,8 @@
 :uri-mongo-js: https://mongodb.github.io/node-mongodb-native/3.5/
 :uri-node-http: https://nodejs.org/docs/latest-v11.x/api/http.html
 :uri-yaml: https://yaml.org/
+:uri-django-remote: https://docs.djangoproject.com/en/3.1/howto/auth-remote-user/
+:uri-django-rub: https://docs.djangoproject.com/en/3.1/ref/contrib/auth/#django.contrib.auth.backends.RemoteUserBackend
 
 = UQcloud zones guide
 :author: Alex Wilson (EAIT ITIG)
@@ -1777,6 +1779,77 @@ you can either email mailto:helpdesk@eait.uq.edu.au[Helpdesk], or, if you're
 an advanced user and want to try it yourself, look at what `zoneinit` does when
 it initialises the zone (`zoneinit` is located in `/usr/local/sbin`).
 
+=== Python versions and uwsgi
+
+Users of Python programs in zones sometimes need a specific release version of
+Python rather than just any available.
+
+In all Ubuntu-based images (including webproject), there is a "system" Python
+(usually a slightly older version -- e.g. Python 3.6 in Ubuntu 18.04) which
+cannot be removed or upgraded. You can, however, add additional Python versions
+under different names, which is the recommended method (e.g. Python 3.8 will be
+named `python3.8`, not `python` or `python3` -- both of those will still point
+at the system Python).
+
+You can install an appropriately configured Python from the "deadsnakes" PPA,
+or compile it yourself from source.
+
+To install from the PPA, in webproject images prior to version 3.2.0, you'll
+need to add the PPA first:
+
+[source,shell-session]
+....
+root@foobaz:~# add-apt-repository ppa:deadsnakes/ppa
+....
+
+(in 3.2.0 and later this is already done in the image and you don't need to
+run it again)
+
+Then you can install alternative Python versions by specifying them to
+`apt-get install` (don't forget to install `-dev` packages so that `pip`
+can compile wheels and add-in modules):
+
+[source,shell-session]
+....
+root@foobaz:~# apt-get install python3.8 python3.8-dev
+....
+
+This will install Python 3.8 as a new version of Python, but will not remove
+any other existing versions installed on the system.
+
+Different versions of the webproject image may come with multiple Python
+versions already installed, so you should check whether the one you want is
+already installed before running `apt-get`.
+
+Once you've installed a different version of Python, in order to use it with
+`uwsgi`, you will need to re-install `uwsgi` via `pip` or `easy_install`. The
+existing `uwsgi` in the webproject image is built against the system Python
+and can't be used with a different version.
+
+You can do this using `-m` to run `pip`:
+
+[source,shell-session]
+....
+root@foobaz:~# python3.8 -m pip install uwsgi
+....
+
+This will replace `uwsgi` on the system with a version linked against Python
+3.8. You will need to restart the `uwsgi` service with `systemctl restart uwsgi`
+to run the new version.
+
+If you need to double-check which version `uwsgi` is currently linked against,
+you can use `ldd`:
+
+[source,shell-session]
+....
+root@foobaz:~# ldd $(which uwsgi) | grep python
+        libpython3.6m.so.1.0 => /usr/lib/x86_64-linux-gnu/libpython3.6m.so.1.0 (0x00007fffed400000) <1>
+....
+<1> We can see here that the binary is linked against `libpython3.6m.so.1.0`,
+    which belongs to Python 3.6 (in this case, the system Python).
+
+You can read more about using uwsgi to run Python web applications such as Flask
+or Django in the section <<python-uwsgi>>.
 
 === Using Visual Studio `code-server`
 
@@ -2007,7 +2080,7 @@ In the `webproject` image, we send the PHP error log output into the file
 experiencing problems.
 
 
-
+[[python-uwsgi]]
 === Python/uwsgi (Django, Flask etc)
 
 For running Python web applications, including those based on frameworks like
@@ -2322,6 +2395,70 @@ ALLOWED_HOSTS = ['foobar.uqcloud.net'] <1>
 ....
 <1> Add your zone's public hostname here (e.g. `foobar.uqcloud.net`).
 
+==== Django tips and tricks
+
+===== Static assets
+
+You may find that your Django project needs to use static assets (e.g. CSS or
+JavaScript files) served from a `/static` directory. Django (unlike some other
+frameworks) won't serve these automatically for you and expects a front-end
+web server to do it instead.
+
+To make this work, edit your `/etc/nginx/frameworks-available/uwsgi.conf` file
+and add a `location` block like the following:
+
+[source,nginx]
+....
+location /static {
+    alias /var/www/uwsgi/app/static;
+}
+....
+
+(You'll need to adjust the path to match your application.)
+
+===== UQ authentication
+
+Django includes an authentication backend module named `RemoteUserBackend`,
+which is {uri-django-remote}[documented on the Django website]. This backend
+can be used with the built-in nginx UQ SSO support to enable your Django app
+to easily authenticate UQ users.
+
+You'll need to create a new class inheriting from `RemoteUserMiddleware` in
+order to set the header name in use:
+
+[source,python]
+....
+from django.contrib.auth.middleware import RemoteUserMiddleware
+
+class UQRemoteUserMiddleware(RemoteUserMiddleware):
+    header = 'HTTP_X_UQ_USER'
+....
+
+Then, in your `settings.py` you can set the middleware and backend:
+
+[source,python]
+....
+MIDDLEWARE = [
+  '...',
+  'app.middleware.UQRemoteUserMiddleware'
+  '...'
+]
+
+AUTHENTICATION_BACKENDS = [
+  'django.contrib.auth.backends.RemoteUserBackend'
+]
+....
+
+If you want to copy more information about the user into your User model, you
+can also override parts of {uri-django-rub}[`RemoteUserBackend`] itself to do
+this (in the `configure_user` function).
+
+===== Using alternative Python versions
+
+Django users commonly want to use the most recent Python version available
+in order to get access to new features. See the section
+<<Python versions and uwsgi>> for more details on managing multiple Python
+versions on your zone.
 
 === Node.js with MongoDB
 
