@@ -1497,10 +1497,58 @@ to reload them by running `systemctl reload nginx`:
 root@foobar:~# systemctl reload nginx
 ....
 
+If you forget to do this, your configuration changes will not be applied
+(`nginx` will continue running with the configuration as it was when it was
+last reloaded or restarted).
+
 TIP: Editing the `nginx` configuration files and reloading them must be done as
      the `root` user. If you're logged in as a normal user, you can use the
      `sudo` command to run your editor as `root`, or copy over the file with a
      new version with `sudo cp ...`.
+
+==== Errors and mistakes
+
+If you make a mistake in the `nginx` configuration files and attempt to
+reload `nginx`, you may receive an error from `systemctl` like this:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl reload nginx
+Job for nginx.service failed because the control process exited with error code. See "systemctl status nginx.service" and "journalctl -xe" for details.
+....
+
+This is letting you know that the reload operation failed (the `nginx` is
+probably still running fine with its old configuration). You can find more
+information about what's wrong by looking in the `nginx` error log:
+
+[source,shell-session]
+....
+root@foobar:~# tail /var/log/nginx/error.log
+2020/09/21 05:22:15 [emerg] 17250#17250: invalid number of the map parameters in /etc/nginx/conf.d/auth.conf:29
+....
+
+This should give you a specific line number and filename where the configuration
+error is located, as well as a brief description.
+
+You can also use the command `nginx -t` to validate the configuration for
+basic syntax errors:
+
+[source,shell-session]
+....
+root@foobar:~# nginx -t
+nginx: [emerg] invalid number of the map parameters in /etc/nginx/conf.d/auth.conf:29
+nginx: configuration file /etc/nginx/nginx.conf test failed
+....
+
+After you've corrected the issue, you can just use `systemctl reload nginx`
+again as usual to reload:
+
+[source,shell-session]
+....
+root@foobar:~# vi /etc/nginx/conf.d/auth.conf
+...
+root@foobar:~# systemctl reload nginx
+....
 
 === Web single sign-on and access control
 
@@ -1620,6 +1668,9 @@ map $uri $acl {
    default              "allow:*";
 }
 ....
+
+NOTE: Don't forget to reload the nginx configuration after editing it, by
+      running `systemctl reload nginx` as `root`.
 
 ==== Using SSO information in your application
 
