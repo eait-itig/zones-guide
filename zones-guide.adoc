@@ -3658,11 +3658,106 @@ by the system and can be used for support purposes or incident response. This
 too, should be clearly communicated by courses which require the use of zones
 for teaching activities.
 
-=== Student zones in course accounts
-=== Coursemgr settings (images, packages, etc)
-=== Team projects
+=== Staff Use of Coursemgr 
 
+Coursemgr provides a web interface for course staff to provision, manage 
+a large number of student zones and associated student teams. Each course in 
+coursemgr is mapped to a group account in SDC with a sufficient quota for the 
+current semester's enrolment. Due to limited resources shared by many courses, 
+all student zones are expected to be removed when the grades have been finalised.
 
+Coursemgr has the following pages: home, settings, staff, team (only in team mode), 
+compare, admin, exec, tarball and help.    
+
+Course staff, whose uq usernames are on the Staff page, will be automatically 
+given access to student zones as admins. Any changes in staff personnel 
+will be reflected in all student zones within 15 minutes of the change. 
+To limit the number of updates on student zones, we suggest a list of staff 
+be added to Coursemgr before provisioning student zones.    
+
+Please note, staff, who are also current students, should be added to Coursemgr with
+their student id if they want to access student zones from moss. Using their staff account
+means that they can only ssh to the zone when on campus or using UQ VPN. Currently there is
+no checking of staff username on Coursemgr so if a staff can not access Coursemgr after
+being added, please check if their username has been misspelt. 
+ 
+==== Coursemgr settings (images, packages, etc)
+
+Course settings in the coursemgr include the image and package that course zones 
+will be created with and the course mode of operation. The course settings are not
+changed frequently but they can be modified using the Settings page if needed. 
+Course coordinators can request access to the Settings page by emailing EAIT Helpdesk. 
+
+A course can use any public image as the image for student zones. The most commonly used
+image is the webproject image. Some courses use a special image e.g INFS1200, which is
+privately owned by the respective course account.  
+
+The package settings determines how much memory and storage a student zone has. A standard
+z1-standard package is usually used for individual student zones. For team projects, z1-large is 
+the default. A student or a team can request an increase in the package size by emailing 
+EAIT helpdesk. Such request will be accommodated provided that they have taken steps to 
+mitigate the issue e.g not consuming more memory than necessary. 
+
+A course in coursemgr is usually operating in either individual mode or team mode.     
+The individual mode, as the name suggests, is when each student is provided with 
+their own zone. For convenience, Coursemgr fetches enrolment information from UQ LDAP 
+and on the Compare page, displays the list of enrolled students who do not have a zone. 
+Course staff can therefore easily provision student zones in bulk based on the enrolment information. 
+The Compare page also shows existing zones that belong to students who drop out. 
+In that case, Coursemgr would suggest you delete the extra zones since they are no longer needed. 
+
+The general rule is that course staff should check the Compare page periodically and take 
+actions to synchronise the current existing zones with the current enrolment details.  
+
+The team mode is used when zones are created for groups of students i.e teams. 
+The team info needs to be uploaded on the Team page using a csv file, with the following format
+for each line:
+....
+teamname,student1id,student2id
+....
+
+As the team name is used for naming the zone, it can not contain any spaces and can not 
+contain a student id. Once the team info has been registered, the Team page will show the 
+list of all the teams with their name and the members details. Together with the enrolment
+information, the Team page keeps track of which enrolled students are not in a team and
+which students in teams are no longer enrolled i.e shouldn't have access to the team zone.
+  
+Each team's name contains a hyperlink to another page where you can add or remove members 
+from a team. You can search for a student using part of their student id and coursemgr 
+will return a list of students that are enrolled in the course and whose id matches the filter.  
+
+Under the team mode, the Compare page shows the discrepancy between the team information
+you uploaded and the existing zone metadata. For example, say you have just added a new member 
+to a team as described above. The Compare page will then show there is a discrepancy between
+zone uq users metadata (old membership info) and current team members info (shown on the Team page) 
+for that team. You can choose to update uq users metadata in the zone and confirm that action. 
+Within approximately 10-15 minutes, the zone metadata will be updated and as a result, the new member 
+will have access to the team zone. 
+
+In some cases, there are special zones that were not created through coursemgr. They are 
+usually infrastructure zones that are set up by course staff or EAIT IT Helpdesk and are 
+intended to be kept around. In those cases, you can ask Coursemgr to simply ignore those zones. 
+That will help reduce the risk of mistakenly deleting those critical zones by mistake 
+since Coursemgr, otherwise, would display them as extra unknown zones and suggest deleting them.  
+
+=== Student use of Coursemgr
+
+In the individual mode, student zones are named with a randomly generated string so there is a need
+for students to be able to see their zone details to be able to connect to it. As such, students
+who are enrolled in a course, say infs1200, can go to https://coursemgr.uqcloud.net/infs1200 to 
+view their zone information and status if their zone has been provisioned. In the case where 
+a student's zone does not exist yet, Coursemgr gives them an option to create the zone themselves.
+
+Similarly, in the team mode, students can view the information about their team zone including the status
+if it has been provisioned. However, unlike the individual mode, students do not have the option to
+create their team zone by themselves but have to contact the course staff to get that done for them. 
+
+In both modes, coursemgr also has an advanced page where students can start/stop/reboot their zones.
+The actions available on this page are dependent on the status of the zone. For example, when a zone
+is stopped, only start action is available. When a zone is running, only reboot and stop actions are
+available. It is advised to wait at least 5 minutes for the action to be completely done.
+Rebooting a machine many times in a short period of time is very likely to cause more problems 
+than it would solve, thus doing so is highly discouraged. 
 
 [appendix]
 == Fabric networks and public IP addresses [[fabrics]]
