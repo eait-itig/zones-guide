@@ -3665,11 +3665,162 @@ for teaching activities.
 
 
 [appendix]
-== Fabric networks and public IP addresses [[fabrics]]
+== Fabric networks, public IP addresses and high availability [[fabrics]]
 
 === Network and application design
+
+Let's imagine we want to deploy a fairly standard 3-tier web application,
+consisting of a front-end, back-end and database:
+
+[svgbob]
+....
+  +------------------------+
+  | Front-end (JavaScript) |
+  +------------------------+
+              |
+              | HTTP (AJAX)
+              v
+  +------------------------+
+  | Back-end (Flask)       |
+  +------------------------+
+              |
+              | PGSQL protocol
+              v
+  +------------------------+
+  | Database (PostgreSQL)  |
+  +------------------------+
+....
+
+We could easily deploy all 3 of these components within a single zone. However,
+the requirements and expected upgrade schedules for each component are rather
+different.
+
+Let's imagine we discover that in order to use some new feature in a different
+Python version for our back-end component, we need to upgrade Python. However,
+to upgrade it, we discover that we need to move to a newer image (e.g. we're
+on too old a distro version to just install it easily).
+
+If we had each component in its own zone, then we could just replace the
+back-end zone with a newly deployed one. We may even be able to do this without
+any down-time, thanks to the fact that all our actual data is persisted in the
+database, which we're not touching.
+
+If we have all 3 tiers of our application in one zone, this kind of upgrade is
+a lot more difficult: we have to consider the other two tiers all the time when
+planning it, and we are a lot closer to putting our stored data in the database
+at risk if we make a mistake.
+
+As well as the upgrade problem, we also face issues when considering scale-out:
+let's imagine our application suddenly has a lot more users than it has had
+in the past. If we can easily identify that the bottleneck in performance is
+in the back-end layer, and it runs in its own zone, we can easily allocate it
+additional resources, or even create multiple back-end zones to scale it out.
+
+Another angle to consider is security: in general, the less software you have
+installed in a given zone, the less likely it is to have a critical
+vulnerability at any given time. When we dedicate each zone to a single purpose,
+it frees us up to install much less software in it. It also allows us to
+more easily restrict what that software can do if it gets compromised.
+
+If you've studied stateless application deployment in the context of container
+tools like Docker or Kubernetes before, you may recognise these motivations.
+Zones can be deployed based on Docker images (see <<docker>>), so deploying
+these as separate zones will match what you might expect.
+
+=== Networking between tiers
+
+In the 3-tier application we just discussed, really only the back-end and
+front-end tiers need to have any exposure to the client machine (the front-end
+assets have to be served to the user, and then when they're running they need
+to reach the back-end's APIs to do their work). The database tier does not
+need any direct access.
+
+The `zones` network (which is the default place to deploy new zones) is shared
+between all users of the Triton infrastructure and exists to help provide
+external access. If we don't need that, we can help to improve our security
+situation (and also make things more convenient for ourselves) by deploying
+zones on a private network just for our use.
+
+To this end, Triton provides "fabric" networks, which are private networks you
+can create and manage within your account. Zones deployed on the same fabric
+network can talk to each other but not to anything outside (unless you
+configure it so). This provides a convenient building block for our design.
+
+Let's extend our example a little more and add a 4th component -- an SSO
+gateway. This is convenient on the UQcloud zones, as the SSO gateway can easily
+be created from the `webproject` image which includes support for this built-in.
+
+[svgbob]
+....
+               +---------+
+               | clients |
+               +----+----+
+                    |
+                    |
+      +--+----------+--------+--+      zones network
+         |                   |
+         v                   v
+ +-------+-------+     +-----+---------+
+ | SSO gateway 1 |     | SSO gateway 2 |
+ | (webproject)  |     |               |
+ +------+--------+     +-------+-------+
+        |                      |
+        v                      v
+     +--+----+--------------+--+-----------------+-----------------+--+   myapp fabric
+             ^              ^                    ^                 ^
+             |              |                    |                 |
+             |              |                    |                 |
++------------+---+   +------+---------+       +--+--------+     +--+--------+
+| frontend 1     |   | frontend 2     |       | backend 1 |     | backend 2 |
+| (static nginx) |   |                |       | (flask)   |     |           |
++----------------+   +----------------+       +---+-------+     +----+------+
+                                                  |                  |
+                                                  |                  |
+                                                  v                  v
+                     +----+----------------------++------------------+--+----+   db fabric
+                          ^                      ^                      ^
+                          |                      |                      |
+                          |                      |                      |
+                   +------+--------+    +--------+------+      +--------+------+
+                   | database 1    |    | database 2    |      | database 3    |
+                   | (cockroachDB) |    | (cockroachDB) |      | (cockroachDB) |
+                   +---------------+    +---------------+      +---------------+
+
+....
+
+In this diagram we've plotted out 3 different networks -- the shared `zones`
+network and two fabric networks (`myapp`, for our "app" tiers -- front-end
+and back-end; and `db` for our database servers).
+
+You should notice that many of the zones in this design are on more than one
+network at the same time (e.g. the SSO gateways are on `zones` as well as
+`myapp`, and the back-ends are on `myapp` as well as `db`). This is perfectly
+OK, and even encouraged!
+
+The separate networks mean that each zone is restricted to only talking to
+the zones it needs to operate -- e.g. the front-end zones can't reach the
+database directly, and the database zones can't reach anything except each other
+and the backends.
+
+We also have two or more zones of each type: this is so that there is no single
+point of failure (SPOF) in the design, meaning that no one zone or compute node
+failure can bring down our web app. This is important if you want to set up
+an application which needs to operate even during a hardware failure, or just
+the periodic reboots for CN upgrades which happen every 6-12 months on UQcloud.
+
+As part of removing SPOFs, we also replaced classic PostgreSQL with CockroachDB,
+which is a mostly-drop-in-compatible alternative that supports high-availability
+clustering (multiple zones can be part of the same database -- as long as
+2/3 of the zones are running we can continue to serve traffic).
+
+In the following sections we'll go through this design in more depth as
+we deploy it, explaining how to create and set up the fabric networks, place
+zones on them, and set up the website on top.
+
 === Creating and managing fabric networks
 === Placing zones on fabric networks
+=== Naming clusters with CNS
+=== Creating load-balancers
 === Using "zones-public" for public IP addresses
 
 
@@ -3679,12 +3830,8 @@ for teaching activities.
 === Accounts, sub-users and roles
 === Writing aperture rules
 
-
 [appendix]
-== High-availability clustering
-
-=== DNS for zones
-=== Managing CNS metadata
+== Using Docker images with Triton [[docker]]
 
 
 [appendix]
