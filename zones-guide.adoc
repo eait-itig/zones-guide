@@ -106,7 +106,7 @@ to give to the Triton system to let it identify you.
 
 It's best for your security to store SSH private keys in one of two ways: either
 on disk, encrypted, protected with a strong passphrase; or on a hardware device
-like a Yubikey.
+like a YubiKey.
 
 On the staff and student general-purpose UNIX servers (`mango.eait.uq.edu.au`
 and `moss.labs.eait.uq.edu.au`), there's a command which will help you to
@@ -1957,6 +1957,171 @@ image::vscode-zone.png[Screenshot,600]
 
 TIP: This section is specifically for users of zones based on the `webproject`
      image (version 3.0.0 or later).
+
+=== Static HTML (and JavaScript)
+
+For client-side web applications which consist entirely of static HTML and
+JavaScript (plus other assets like CSS and images etc), you don't have to
+enable anything in `webproject`.
+
+You can place your static assets in the `/var/www/htdocs` directory. The
+image ships with some example files in that directory, which you can delete.
+
+A file named `index.html` or `index.htm` in the top of the `/var/www/htdocs`
+directory is what will be served to visitors when they open
+`https://<user>-<alias>.uqcloud.net/` in a web browser.
+
+Any other files or sub-directories you create under `/var/www/htdocs` are
+mapped directly into URIs under the root of your website, e.g:
+
+ * `https://<user>-<alias>.uqcloud.net/thing.png` will map to
+   `/var/www/htdocs/thing.png`
+ * `https://<user>-<alias>.uqcloud.net/images/thing.png` will map to
+   `/var/www/htdocs/images/thing.png`
+ * `https://<user>-<alias>.uqcloud.net/foobar/` will map to
+   `/var/www/htdocs/foobar/index.html`
+
+==== Deploying "compiled" JavaScript framework apps
+
+When using web frameworks like React or Angular, usually there is a "build"
+or "compile" step involved where your JavaScript and other static asset files
+are combined into bundles suitable for serving directly to a browser.
+
+For example, in a React app you would run `npm run build` -- this populates the
+`build/` directory with the compiled app:
+
+[source,shell-session]
+....
+$ npm run build
+> react-example@0.1.0 build /home/alex/dev/react-example
+> react-scripts build
+
+Creating an optimized production build...
+Compiled successfully.
+
+$ ls -la build
+total 31
+drwxr-xr-x 3 user user   10 Mar  4 09:45 .
+drwxr-xr-x 7 user user   11 Mar  4 09:45 ..
+-rw-r--r-- 1 user user 1092 Mar  4 09:45 asset-manifest.json
+-rw-r--r-- 1 user user 3870 Mar  4 09:45 favicon.ico
+-rw-r--r-- 1 user user 3034 Mar  4 09:45 index.html
+-rw-r--r-- 1 user user 5347 Mar  4 09:45 logo192.png
+-rw-r--r-- 1 user user 9664 Mar  4 09:45 logo512.png
+-rw-r--r-- 1 user user  492 Mar  4 09:45 manifest.json
+-rw-r--r-- 1 user user   67 Mar  4 09:45 robots.txt
+drwxr-xr-x 5 user user    5 Mar  4 09:45 static
+....
+
+You can see in the output that an `index.html` file has been generated here.
+All that's needed to deploy such an app is to copy these "compiled" files
+straight into `/var/www/htdocs` on the zone, and then the root of your website
+will serve the application.
+
+TIP: You don't need to run `npm run build` on your zone, necessarily -- you
+     could run it somewhere else and then upload the files to your zone (e.g.
+     in a CI system or on your laptop). Some JavaScript frameworks have very
+     expensive "build" steps which may not be able to run in a small-sized
+     zone (even though serving the actual app will work fine).
+
+==== Changing the static path
+
+If you want to change where static assets are served from on your zone (i.e.
+change `/var/www/htdocs` to be somewhere else, like the `public/` directory
+inside a Django application's directory), you can edit the nginx configuration
+files to alter it.
+
+In the file `/etc/nginx/sites-available/https-site` you will find a `root`
+directive:
+
+[source,nginx]
+....
+server {
+        listen 443 default_server;
+
+        server_name  user-alias.uqcloud.net;
+        root         /var/www/htdocs;
+
+        # ...
+}
+....
+
+Change the directory path for the `root` directive to the new path:
+
+[source,nginx]
+....
+server{
+        # ...
+        root        /var/www/uwsgi/public;
+        # ...
+}
+....
+
+And then reload the nginx configuration:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl reload nginx
+....
+
+==== Combining static assets with frameworks
+
+The later sections in this chapter will cover different "frameworks" which
+allow zones to generate dynamic content server-side. You can combine these with
+your static app by making your dynamic content (e.g. your API which you access
+via AJAX calls in your JavaScript code) exist under a particular set of URIs.
+
+For example, if your dynamic content is all at URIs under
+`https://<user>-<alias>.uqcloud.net/api/...` then it can co-exist easily
+with your JavaScript application (as long as there's no file or directory named
+`api` in it).
+
+If you're using the PHP or JSP frameworks, you don't need to change anything
+at all (since these only handle files ending in `.php` or `.jsp`).
+
+If you're using a framework like Node.js or Python with UWSGI, then you will
+likely want to make one small change to the default framework configuration
+file.
+
+For example, in `/etc/nginx/frameworks-available/uwsgi.conf` you will find the
+following section:
+
+[source,nginx]
+....
+location / {
+        try_files $uri @dflapp;
+}
+....
+
+This instructs nginx to look for a static file which matches the exact URI the
+user is requesting, and then if it can't find one, it passes the request
+through to your UWSGI application for handling.
+
+However, this will not work for `index.html`. The framework is set up this way
+so that you can easily handle the `/` root URI in your UWSGI app.
+
+To change it so that the root of your website is the `index.html` file from
+your static files instead, add `$uri/` to this line:
+
+[source,nginx]
+....
+location / {
+        try_files $uri $uri/ @dflapp;
+}
+....
+
+Then reload the nginx configuration:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl reload nginx
+....
+
+Now when users visit `https://<user>-<alias>.uqcloud.net` they will be served
+the `index.html` file from your client-side app instead of being forwarded to
+your UWSGI application. Any URI which doesn't map to a static file will still
+be forwarded, so you can use the `/api/...` URI design idea to provide endpoints
+for AJAX.
 
 === PHP with MySQL
 
