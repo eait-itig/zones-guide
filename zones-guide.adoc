@@ -1838,25 +1838,53 @@ Python rather than just any available.
 In all Ubuntu-based images (including webproject), there is a "system" Python
 (usually a slightly older version -- e.g. Python 3.6 in Ubuntu 18.04) which
 cannot be removed or upgraded. You can, however, add additional Python versions
-under different names, which is the recommended method (e.g. Python 3.8 will be
-named `python3.8`, not `python` or `python3` -- both of those will still point
+under different names, which is the recommended method (e.g. Python 3.9 will be
+named `python3.9`, not `python` or `python3` -- both of those will still point
 at the system Python).
 
-You can install an appropriately configured Python from the "deadsnakes" PPA,
-or compile it yourself from source.
+As of webproject version 3.3.0, the latest stable Python (at time of writing,
+this was Python 3.9) is pre-installed alongside the "system" Python in
+this manner.
 
-To install from the PPA, in webproject images prior to version 3.2.0, you'll
-need to add the PPA first:
+If you just want to use the latest stable Python instead of the default system
+python, you can invoke it directly as `python3.9` (install packages with
+`pip3.9`).
+
+When using `uwsgi` for Python web frameworks, a given `uwsgi` binary can only
+work with one version of Python at a time. We include a separate copy of
+`uwsgi` for each version of Python pre-installed in the webproject image.
+
+To change which `uwsgi` is in use, you can modify the symlink at
+`/usr/local/bin/uwsgi` -- for example, to change to the Python 3.9 `uwsgi`:
 
 [source,shell-session]
 ....
-root@foobaz:~# add-apt-repository ppa:deadsnakes/ppa
+root@foobaz:~# ln -sf uwsgi3.9 /usr/local/bin/uwsgi
 ....
 
-(in 3.2.0 and later this is already done in the image and you don't need to
-run it again)
+After doing this, you will need to restart the `uwsgi` systemd service:
 
-Then you can install alternative Python versions by specifying them to
+[source,shell-session]
+....
+root@foobaz:~# systemctl restart uwsgi
+....
+
+You can check which version is currently the target of the symlink by using
+`ls -la`:
+
+[source,shell-session]
+....
+root@foobaz:~# ls -la /usr/local/bin/uwsgi
+lrwxrwxrwx   1 root     root           8 Feb 15 07:54 /usr/local/bin/uwsgi -> uwsgi3.9
+....
+
+==== Installing other Python versions
+
+If you need other Python versions, you can install an appropriately configured
+Python from the "deadsnakes" PPA, or compile it yourself from source.
+
+The PPA is already configured and available in the webproject image, so you
+can install alternative Python versions by specifying them to
 `apt-get install` (don't forget to install `-dev` packages so that `pip`
 can compile wheels and add-in modules):
 
@@ -1868,28 +1896,27 @@ root@foobaz:~# apt-get install python3.8 python3.8-dev
 This will install Python 3.8 as a new version of Python, but will not remove
 any other existing versions installed on the system.
 
-Different versions of the webproject image may come with multiple Python
-versions already installed, so you should check whether the one you want is
-already installed before running `apt-get`.
-
 Once you've installed a different version of Python, in order to use it with
-`uwsgi`, you will need to re-install `uwsgi` via `pip` or `easy_install`. The
-existing `uwsgi` in the webproject image is built against the system Python
-and can't be used with a different version.
+`uwsgi`, you will need to re-install `uwsgi` via `pip` or `easy_install`.
 
-You can do this using `-m` to run `pip`:
+We recommend deleting the `/usr/local/bin/uwsgi` symlink before doing this,
+since `pip` will overwrite that file with the new version. Then you can move
+it to a versioned name and re-create the symlink afterwards.
 
 [source,shell-session]
 ....
+root@foobaz:~# rm -f /usr/local/bin/uwsgi
 root@foobaz:~# python3.8 -m pip install uwsgi
+root@foobaz:~# mv /usr/local/bin/uwsgi{,3.8}
+root@foobaz:~# ln -s uwsgi3.8 /usr/local/bin/uwsgi
 ....
 
 This will replace `uwsgi` on the system with a version linked against Python
 3.8. You will need to restart the `uwsgi` service with `systemctl restart uwsgi`
 to run the new version.
 
-If you need to double-check which version `uwsgi` is currently linked against,
-you can use `ldd`:
+If you need to double-check which version of Python a particular `uwsgi` binary
+is currently linked against, you can use `ldd`:
 
 [source,shell-session]
 ....
