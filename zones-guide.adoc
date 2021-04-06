@@ -1936,7 +1936,7 @@ using the web-hosted version of Visual Studio Code (`code-server`) for editing
 your website and code.
 
 The image is set up to spawn one `code-server` for each enabled user. As each
-of these uses quite a lot of RAM (around ~200 MB RSS per instance is typical),
+of these uses quite a lot of RAM (around 200 MB RSS per instance is typical),
 you must enable each user individually to avoid accidentally using up all of
 the zone's memory.
 
