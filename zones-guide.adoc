@@ -529,10 +529,14 @@ available networks by running the command `triton network list`:
 ....
 $ triton network list
 SHORTID   NAME               SUBNET            GATEWAY        FABRIC  VLAN  PUBLIC
-b10a8f1c  zones              -                 -              -       -     false
-e4283953  zones-public       -                 -              -       -     false
+b10a8f1c  zones              -                 -              -       -     true
+e4283953  zones-public       -                 -              -       -     true
 dbac7eb6  My-Fabric-Network  192.168.128.0/22  192.168.128.1  true    2     false
 ....
+
+NOTE: Your output from `triton network list` may be different to the output
+      above. In particular, the `zones-public` network will be missing for
+      most accounts which have not requested access to public IPs.
 
 Generally, the network you will want to use for your zones is the one
 named `zones`.
