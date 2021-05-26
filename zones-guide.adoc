@@ -3427,20 +3427,16 @@ TIP: If you have need to be regularly sending more than 4 emails/minute for a
 ==== Sender domains and SPF
 
 We recommend that you send email from an email address of the form:
-`noreply@zonename.zones.eait.uq.edu.au`. The EAIT mailhubs will only accept
-mail with certain sender addresses, and some domains will be rejected outright
--- for example, sending email from a zone with a sender address set to a
-student email like `s4xxxx@student.uq.edu.au` or `name.lastname@uq.net.au`
-will be rejected.
+`noreply@account-zone.uqcloud.net`.
 
-If you want to add the EAIT mailhubs to an SPF record on a domain so that they
-can send email on its behalf, you should include `_spf.uq.edu.au`, using a
-record like the following:
+The EAIT mailhubs will allow outgoing emails with envelope sender and `From`
+addresses of the pattern `*@account-zone.uqcloud.net`. If you attempt to send
+email with a different envelope sender or `From` address, the mailhubs will
+silently alter your email to originate from `noreply@account-zone.uqcloud.net`
+instead.
 
-....
-domain.     IN    TXT       "v=spf1 include:_spf.uq.edu.au ~all"
-....
-
+If you want your application to be able to send email from a different address,
+please contact mailto:helpdesk@eait.uq.edu.au[Helpdesk].
 
 === Manta object storage
 
