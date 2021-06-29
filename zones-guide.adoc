@@ -29,6 +29,7 @@
 :uri-yaml: https://yaml.org/
 :uri-django-remote: https://docs.djangoproject.com/en/3.1/howto/auth-remote-user/
 :uri-django-rub: https://docs.djangoproject.com/en/3.1/ref/contrib/auth/#django.contrib.auth.backends.RemoteUserBackend
+:uri-ghost: https://hub.docker.com/_/ghost
 
 = UQcloud zones guide
 :author: Alex Wilson (EAIT ITIG)
@@ -4025,6 +4026,371 @@ zones on them, and set up the website on top.
 [appendix]
 == Using Docker images with Triton [[docker]]
 
+While `docker` and `docker-compose` do not work within a zone (since zones are
+not truly running a Linux kernel they don't have some of the features which
+`docker` needs to operate), we can create zones using Docker images.
+
+To do this we actually use the real `docker` command, but we run it on the
+same machine we run the `triton` command (not in a zone). With some
+configuration, the `docker` command will operate on the UQcloud Triton cluster
+instead of a local Docker daemon.
+
+The command `triton profile docker-setup` allows us to generate the
+configuration we need easily:
+
+[source,shell-session]
+....
+$ triton profile docker-setup
+WARNING: Docker uses authentication via client TLS certificates that do not
+support encrypted (passphrase protected) keys or SSH agents.
+
+If you continue, this profile setup will create a fresh private key which is
+written unencrypted to disk in "~/.triton/docker" for use by the Docker
+client. This key will be useable only for Docker.
+
+If you do not specifically want to use Docker, you can answer "no" here.
+
+Continue? [y/n] y
+
+Setting up profile "env" to use Docker.
+Successfully setup profile "env" to use Docker (v1.13.1).
+
+To setup environment variables to use the Docker client, run:
+    eval "$(triton env --docker env)"
+    docker info
+Or you can place the commands in your shell profile, e.g.:
+    triton env --docker env >> ~/.profile
+....
+
+As the instructions say at the bottom of the output, we then must run
+`eval "$(triton env --docker)"`:
+
+[source,shell-session]
+....
+$ eval "$(triton env --docker)"
+$ docker info
+...
+Storage Driver: sdc
+ SDCAccount: uqfoobar
+Operating System: SmartDataCenter
+...
+....
+
+If you can run `docker info` and see the text `Storage Driver: sdc` with
+`SDCAccount:` below it and your UQ username, then you've successfully
+configured Docker to use the UQcloud endpoint.
+
+We can then proceed to create a Docker container:
+
+[source,shell-session]
+....
+$ docker run --name foobar -it busybox /bin/sh
+ERRO[0016] error getting events from daemon: Error response from daemon: (NotImplemented) events is not implemented (c41ef1fc-5cd5-4855-a120-4221e8db7a25)
+
+/ # uname -a
+Linux foobar 4.3.0 BrandZ virtual linux x86_64 GNU/Linux
+....
+
+NOTE: If you see errors with the text `events is not implemented`, you can
+      safely ignore these: they're telling you that the Triton Docker endpoint
+      doesn't support Docker Events, but it's not critical to have it.
+
+If we look in the output of `triton inst ls` while the Docker container is
+running, we can see that the container was created as a regular zone:
+
+[source,shell-session]
+....
+$ triton inst ls
+SHORTID   NAME             IMG                           STATE    FLAGS  AGE
+ccec13c9  foobar           cc8a0e00                      running  DF     38s
+....
+
+Being a regular zone means that the container is given its own IP address
+and hostname (which is different to the default behaviour in regular Docker).
+If you give the `-p` option to `docker run` to specify what ports to open to
+the container, those ports will be open on the container's own IP address,
+not the host.
+
+=== Running web applications in Docker containers
+
+In the section <<Setting up web applications from scratch>>, we discussed
+setting up web servers from scratch in zones so that they interact correctly
+with the EAIT load balancers. To host web applications directly on Docker
+containers, the application running inside the container has to meet those
+same requirements.
+
+The typical design for web applications using Docker is to place one process
+in each container. If it's difficult to make your main application server
+deal correctly with these constraints (e.g. because you want to deploy an
+off-the-shelf image), you may find it simpler to use a docker container based
+on the `webproject` image placed "in front" of your back-end container.
+
+We can do this by giving the UUID of the latest `webproject` image as the
+image name to `docker run` or `docker create`, with the entrypoint specified
+as `/usr/local/sbin/docker-entrypoint`:
+
+[source,shell-session]
+....
+$ triton img list -l name=webproject
+ID                                    NAME        VERSION  STATE   FLAGS  OS       TYPE          PUBDATE
+9ac0d333-ec08-49ed-b4bd-844e61dd9d8f  webproject  3.4.3    active  IP     linux    lx-dataset    2021-06-29
+
+$ docker create \
+    -p 80 -p 443 \
+    9ac0d333-ec08-49ed-b4bd-844e61dd9d8f \
+    /usr/local/sbin/docker-entrypoint
+....
+
+The `docker-entrypoint` script will initialise the `webproject` zone and
+execute `nginx`. Note that other services will not be started like the would
+with a regular `webproject` zone.
+
+To provide configuration for the `nginx` inside the container, you can either
+use `docker copy` or open a shell inside it with `docker exec`. If you only
+need to configure the container to proxy all HTTP traffic to a specific
+backend container, however, you can set the Docker label `proxy_to` to a HTTP
+URI and the entrypoint script will handle it for you:
+
+[source,shell-session]
+....
+$ docker create \
+    --name gateway \
+    --memory 128 \
+    --label proxy_to=http://test.svc.uquser.zones.eait.uq.edu.au:1234 \
+    -p 80 -p 443 \
+    9ac0d333-ec08-49ed-b4bd-844e61dd9d8f \
+    /usr/local/sbin/docker-entrypoint
+....
+
+In the last example, we also set `--memory 128` to make Docker use the
+`z1-xtiny` package. This enables us to fit both the gateway container and
+backend container within the default account quota.
+
+=== Example: Running a Ghost blog
+
+For a full worked example, we will deploy the {uri-ghost}[Ghost] blogging
+platform from its pre-built Docker container.
+
+Since the pre-built container is not easily configured to handle being the
+front-end zone, we will deploy it behind a `webproject` Nginx container. The
+Ghost container will be placed on a dedicated private fabric network (see also
+<<fabrics>>), so that it can't be accidentally exposed to any other users (or
+any other applications on our account).
+
+First, we will create the dedicated fabric network for Ghost:
+
+[source,shell-session]
+....
+$ triton vlan create --name ghost 1001
+Created vlan ghost (1001)
+
+$ triton network create \
+    --name ghost \
+    --subnet 192.168.0.0/24 \ <1>
+    --start-ip 192.168.0.1 \
+    --end-ip 192.168.0.250 \
+    --gateway 192.168.0.254 \
+    1001
+Created network ghost (51886619-ae59-4279-905d-c546e59adb8d)
+....
+<1> These addresses have no specific meaning to the Ghost image, they can be
+    any private (RFC1918) IP subnet.
+
+Next, we will create the actual Ghost container. We set the
+`triton.cns.services` label on this container, so that we can later tell the
+front-end container to connect to a service name. This allows us to replace the
+back-end container later with a new version without making any changes to the
+front-end.
+
+[source,shell-session]
+....
+$ docker create \
+    --name ghost-backend0 \
+    --memory 384 \
+    --env url=https://uqfoobar-ghost.uqcloud.net \ <1>
+    --label triton.cns.services=ghost-backend \ <2>
+    --network ghost \
+    ghost:latest
+....
+<1> This is an environment variable specific to the `ghost` image, which lets
+    the Ghost instance know what its publically accessible URL is.
+<2> Setting the `triton.cns.services` label gives us a CNS service name.
+
+And then, the front-end `webproject` container:
+
+[source,shell-session]
+....
+$ triton img list -l name=webproject
+ID                                    NAME        VERSION  STATE   FLAGS  OS       TYPE          PUBDATE
+9ac0d333-ec08-49ed-b4bd-844e61dd9d8f  webproject  3.4.3    active  IP     linux    lx-dataset    2021-06-29
+
+$ docker create \
+    --name ghost \
+    --memory 128 \
+    --network ghost \ <1>
+    --label proxy_to=http://ghost-backend.svc.uqfoobar.fabric.zones.eait.uq.edu.au:2368 \ <2>
+    -p 80 -p 443 \
+    9ac0d333-ec08-49ed-b4bd-844e61dd9d8f \
+    /usr/local/sbin/docker-entrypoint
+....
+<1> When we give both `--network ghost` and `-p` options, Triton will give the
+    container NICs on both the `ghost` network and the first available "public"
+    network (which by default is `zones`).
+<2> Matches the service name we set up in the previous step (with the DNS suffix
+    for our account attached).
+
+Then we start up the front-end container on its own:
+
+[source,shell-session]
+....
+$ docker start ghost
+....
+
+We do this so that we can adjust the SSO configuration to only allow specific
+users to access `/ghost` (since that will start the initial setup for whoever
+connects to it first, and we want to make sure it's us). We'll edit the SSO
+configuration using `docker exec`:
+
+[source,shell-session]
+....
+$ docker exec -it ghost /bin/bash
+root@uqfoobar-ghost:/# vi /etc/nginx/conf.d/auth.conf
+....
+
+The altered part of the configuration file:
+
+[source,nginx]
+....
+map $uri $acl {
+   ...
+   default              "allow:*"; <1>
+   ~^/ghost             "allow:user:*local";
+   ...
+}
+....
+<1> This will also make the Ghost instance public to the Internet (other than
+    the admin panel).
+
+Then we add our user as a local user and reload `nginx` by running
+`pkill -HUP nginx`:
+
+[source,shell-session]
+....
+root@uqfoobar-ghost:/# uq-add-user uqfoobar
+root@uqfoobar-ghost:/# pkill -HUP nginx
+....
+
+Finally we can start up the back-end container:
+
+[source,shell-session]
+....
+$ docker start ghost-backend0
+....
+
+Now we can browse to https://uqfoobar-ghost.uqcloud.net and see the working
+default Ghost installation.
+
+We can also visit https://uqfoobar-ghost.uqcloud.net/ghost to start the
+initial setup process, and this URL will only work for our user (thanks to
+the SSO configuration protecting it).
+
+=== Caveats (and `docker build`)
+
+While setting up a zone based on a Docker image is a well-trodden path, quite
+a lot of other Docker features are not implemented by the Triton Docker
+endpoint.
+
+In particular, the `docker build` command's implementation on Triton is slow
+and incomplete. We don't recommend using `docker build` against the Triton
+endpoint.
+
+Instead, if you need to build Docker container images, we recommend that you do
+your builds elsewhere (e.g. in a GitHub Action) and push the image to
+DockerHub. Then you can pull the image down and run it on Triton for regular
+use.
+
+=== CI integration
+
+It is possible to take the generated authentication certificate and key output
+by `triton profile docker-setup` and use it in a CI system like GitHub Actions.
+The UQcloud Docker endpoint is accessible from the Internet, so you can connect
+to it from scripts in your CI and perform the `docker pull` and `docker run`
+operations with the newly built image automatically if you wish.
+
+NOTE: If you do decide to use your authentication certificate and key in a CI
+      context, make certain you do not ever commit them to your code
+      repository. Use the "secret storage" or "credentials" feature of your
+      CI system instead.
+
+As an example of how this can be implemented in GitHub Actions: first, the
+contents of our `.github/workflows/main.yml` file:
+
+[source,yaml]
+....
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-qemu-action@v1
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{secrets.DOCKERHUB_USERNAME}}
+          password: ${{secrets.DOCKERHUB_TOKEN}}
+      - id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: user/repo:latest
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v2
+      - run: ./deploy.sh
+        env:
+          DOCKER_CA: ${{secrets.DOCKER_CA}}
+          DOCKER_KEY: ${{secrets.DOCKER_KEY}}
+          DOCKER_CERT: ${{secrets.DOCKER_CERT}}
+          DOCKER_HOST: ${{secrets.DOCKER_HOST}}
+....
+
+This runs the script `deploy.sh` in the root of our repository to do the UQcloud
+specific steps. The contents of that script:
+
+[source,bash]
+....
+#!/bin/bash
+
+mkdir docker-cert
+echo "${DOCKER_CA}" > docker-cert/ca.pem
+echo "${DOCKER_KEY}" > docker-cert/key.pem
+echo "${DOCKER_CERT}" > docker-cert/cert.pem
+
+export DOCKER_CERT_PATH="$(pwd)/docker-cert"
+export DOCKER_TLS_VERIFY=1
+
+docker pull user/repo:latest
+OLDCONTAINERS="$(docker ps -f label=user-repo-ci -q)"
+docker run -d \
+  --name thing \
+  --label user-repo-ci \
+  -p 80 -p 443 \
+  user/repo:latest
+for x in $OLDCONTAINERS; do
+  docker rm -f ${x}
+done
+....
+
+Here, we first set up the certificate and key in the right directory structure
+so that `docker` can use them, then we set environment variables for `docker`.
+
+Then we pull down the image we just built in the `build` CI job, and deploy
+the new image (cleaning up any previous versions of it once the new container
+is running).
 
 [appendix]
 == Native zones and pkgsrc [[pkgsrc]]
