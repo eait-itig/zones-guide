@@ -4317,8 +4317,7 @@ The UQcloud Docker endpoint is accessible from the Internet, so you can connect
 to it from scripts in your CI and perform the `docker pull` and `docker run`
 operations with the newly built image automatically if you wish.
 
-NOTE: If you do decide to use your authentication certificate and key in a CI
-      context, make certain you do not ever commit them to your code
+NOTE: Do not ever commit your Docker certificate and key to your code
       repository. Use the "secret storage" or "credentials" feature of your
       CI system instead.
 
