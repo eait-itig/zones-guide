@@ -4026,14 +4026,17 @@ zones on them, and set up the website on top.
 [appendix]
 == Using Docker images with Triton [[docker]]
 
-While `docker` and `docker-compose` do not work within a zone (since zones are
-not truly running a Linux kernel they don't have some of the features which
-`docker` needs to operate), we can create zones using Docker images.
+One popular piece of software which does not work inside zones is `docker` (and
+other software which uses it such as `docker-compose`). This is due to the fact
+that zones are not running a true Linux kernel, and are missing some of the
+kernel features which `docker` requires.
 
-To do this we actually use the real `docker` command, but we run it on the
-same machine we run the `triton` command (not in a zone). With some
-configuration, the `docker` command will operate on the UQcloud Triton cluster
-instead of a local Docker daemon.
+Instead of using `docker` within our zone, however, we can create new zones
+using Docker images.
+
+To do this we use the real `docker` command, but we run it on the same machine
+we run `triton` commands instead. With some configuration, the `docker` command
+will operate on the UQcloud Triton cluster instead of a Docker daemon.
 
 The command `triton profile docker-setup` allows us to generate the
 configuration we need easily:
@@ -4062,7 +4065,7 @@ Or you can place the commands in your shell profile, e.g.:
     triton env --docker env >> ~/.profile
 ....
 
-As the instructions say at the bottom of the output, we then must run
+As the instructions prompt us to at the bottom of the output, we must then run
 `eval "$(triton env --docker)"`:
 
 [source,shell-session]
@@ -4087,7 +4090,7 @@ We can then proceed to create a Docker container:
 $ docker run --name foobar -it busybox /bin/sh
 ERRO[0016] error getting events from daemon: Error response from daemon: (NotImplemented) events is not implemented (c41ef1fc-5cd5-4855-a120-4221e8db7a25)
 
-/ # uname -a
+# uname -a
 Linux foobar 4.3.0 BrandZ virtual linux x86_64 GNU/Linux
 ....
 
@@ -4120,14 +4123,14 @@ containers, the application running inside the container has to meet those
 same requirements.
 
 The typical design for web applications using Docker is to place one process
-in each container. If it's difficult to make your main application server
-deal correctly with these constraints (e.g. because you want to deploy an
-off-the-shelf image), you may find it simpler to use a docker container based
-on the `webproject` image placed "in front" of your back-end container.
+in each container. If it's difficult to make your main application process
+deal correctly with these constraints itself (e.g. because you want to deploy
+an off-the-shelf image), you may find it simpler to use a docker container
+based on the `webproject` image placed "in front" of your back-end container.
 
-We can do this by giving the UUID of the latest `webproject` image as the
-image name to `docker run` or `docker create`, with the entrypoint specified
-as `/usr/local/sbin/docker-entrypoint`:
+We can make such a container by giving the UUID of the latest `webproject`
+image as the image name to `docker run` or `docker create`, with the entrypoint
+specified as `/usr/local/sbin/docker-entrypoint`:
 
 [source,shell-session]
 ....
@@ -4142,13 +4145,14 @@ $ docker create \
 ....
 
 The `docker-entrypoint` script will initialise the `webproject` zone and
-execute `nginx`. Note that other services will not be started like the would
-with a regular `webproject` zone.
+execute `nginx`. Note that other services will not be started like they would
+with a regular `webproject` zone, so this construct is only useful to run
+`nginx`.
 
 To provide configuration for the `nginx` inside the container, you can either
 use `docker copy` or open a shell inside it with `docker exec`. If you only
 need to configure the container to proxy all HTTP traffic to a specific
-backend container, however, you can set the Docker label `proxy_to` to a HTTP
+backend container, you can also set the Docker label `proxy_to` to a HTTP
 URI and the entrypoint script will handle it for you:
 
 [source,shell-session]
@@ -4174,8 +4178,8 @@ platform from its pre-built Docker container.
 Since the pre-built container is not easily configured to handle being the
 front-end zone, we will deploy it behind a `webproject` Nginx container. The
 Ghost container will be placed on a dedicated private fabric network (see also
-<<fabrics>>), so that it can't be accidentally exposed to any other users (or
-any other applications on our account).
+<<fabrics>>), so that it can't be accidentally exposed to any other users, or
+any other applications on our account.
 
 First, we will create the dedicated fabric network for Ghost:
 
