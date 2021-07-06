@@ -30,6 +30,7 @@
 :uri-django-remote: https://docs.djangoproject.com/en/3.1/howto/auth-remote-user/
 :uri-django-rub: https://docs.djangoproject.com/en/3.1/ref/contrib/auth/#django.contrib.auth.backends.RemoteUserBackend
 :uri-ghost: https://hub.docker.com/_/ghost
+:uri-chat: https://chat.uq.edu.au/_matrix/client/#/room/#uqcloud:chat.uq.edu.au
 
 = UQcloud zones guide
 :author: Alex Wilson (EAIT ITIG)
@@ -3855,6 +3856,115 @@ for teaching activities.
 === Coursemgr settings (images, packages, etc)
 === Team projects
 
+
+== Outages and notifications
+
+All zones generally will have at least two planned maintenance outages each
+year where the zone will be rebooted (in order to upgrade the kernel version
+of the underlying Compute Node). When hardware or other system failures occur,
+there may be emergency (unplanned) outages as well.
+
+When an outage will occur (or is occuring, if it's unplanned), the UQcloud
+system generates email notification messages and sends them to users which
+it identifies as "owners" of each zone involved.
+
+You can be an "owner" for a zone for the purposes of outage notification in
+one of several ways:
+
+ * The zone belongs to an individual (staff/student) account and it is
+   your account; or
+ * You are listed in the `uq_users` metadata property on a `webproject` zone; or
+ * The zone belongs to a group account and your account is a member of the
+   `administrator` role on the account.
+
+Email notifications generally look like this:
+
+....
+From: EAIT IT Helpdesk <helpdesk@eait.uq.edu.au>
+Subject: Maintenance outages: SmartOS/Triton zones under uqcloud.net <1>
+To: Your Name <your.name@uq.edu.au> <2>
+
+Hi,
+
+Our records indicate that you are a contact person or account holder for
+one or more zones hosted within the EAIT Triton cluster.
+
+Across the week of the 5th of Jul 2021 we will be rebooting all of
+the SDC/Triton compute nodes in order to perform critical software updates.
+
+This will mean that each your zones will be shut down, experience an outage
+of 15-20 minutes, and start back up again, at some point during the week.
+
+Your zones will be rebooted at the following times:
+
+  * 2021-07-05 09:30 +10:00 (expected to last 15 min) <3>
+      [account1] <4>
+        - account1-foo.zones.eait.uq.edu.au (065d642a)
+      [account2]
+        - account2-foobar.zones.eait.uq.edu.au (69882fd9)
+      [account3]
+        - account3-test.zones.eait.uq.edu.au (046a2837)
+        - account3-test2.zones.eait.uq.edu.au (3771b80c)
+
+If you believe any of your zones to still be unavailable after the end of
+the relevant outage window, please contact helpdesk@eait.uq.edu.au, including
+the steps you have followed and any error messages you have received.
+
+Kind regards,
+The EAIT IT Team
+....
+<1> Emails have a subject line which generally includes the terms
+    "maintenance outage" or "emergency outage", "SmartOS/Triton zones" and
+    usually "uqcloud.net"
+<2> Each email is sent directly to your address (not a distribution group/list)
+<3> The zones list is organised by timeslot and then account -- one top-level
+    bullet point will appear for each timeslot you have zones in.
+<4> Within each timeslot a section for each account then lists the zones which
+    will experience the outage.
+
+Sometimes planned maintenance outages can last longer than the original plan,
+if hardware failures or issues are triggered by the routine procedure.
+
+In cases like this, you will receive a follow-up email, explaining when the
+zones which are affected will be available again (or that no ETA is yet
+available).
+
+=== Types of outages
+
+Platform Image (PI) upgrade reboot:: Routine rolling reboots of the entire
+    UQcloud cluster, one machine at a time, to upgrade CN kernel versions.
+    Normally occurs twice per year, once around late December and once in early
+    to mid July. Reboots typically take place **during business hours** (so that
+    staff are available to respond to issues) and typically result in
+    **10-20 minutes** of downtime for zones (the zones **are rebooted**).
+
+Migration:: Occurs when your zone is being migrated from one CN to another,
+    either individually or as part of an evacuation of a CN. Migrations
+    typically occur **outside business hours** and typically result in
+    **1-5 minutes** of downtime for zones (the zones **are rebooted**).
+
+Network:: Network upgrades often result in short to medium-length outages
+    for individual compute nodes or entire racks. These typically take place
+    **outside business hours** and typically result in **5-30 minutes** of
+    downtime for zones (but the zones **are not rebooted**).
+
+Hardware failure (repairable):: A hardware component in the CN has failed, but
+    has been diagnosed and is field-replaceable. This can happen at any time
+    (unscheduled) and typically results in anywhere from **1 to 2 hours** of
+    downtime for zones once staff are on-site. This is very rare.
+
+Hardware failure (chassis swap):: A hardware component in the CN has failed
+    and either can't be diagnosed easily or isn't easily field-replaceable.
+    The CN's disks will be removed and swapped to a spare chassis. This can
+    happen at any time (unscheduled) and typically results in anywhere from
+    **2 to 6 hours** of downtime for zones once staff are on-site. This is
+    very rare.
+
+=== Realtime information on `chat.uq.edu.au`
+
+You can join the Matrix room {uri-chat}[#uqcloud:chat.uq.edu.au] for real-time
+updates on the progress of outages and reboots. A bot in the room posts
+progress updates, and you can ask questions about ongoing issues.
 
 
 [appendix]
