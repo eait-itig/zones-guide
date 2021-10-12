@@ -11,9 +11,11 @@
 :uri-studentkeys: https://student.eait.uq.edu.au/accounts/sshkeys.ephp
 :uri-winscp: https://winscp.net/eng/download.php
 :uri-filezilla: https://filezilla-project.org/download.php?platform=win64
+:uri-cyberduck: https://cyberduck.io/download/
 :uri-uqvpn: https://my.uq.edu.au/information-and-services/information-technology/working-remotely/vpn-virtual-private-network
 :uri-eaitvpn: https://help.eait.uq.edu.au/remote/vpn/
 :uri-winscp-tunnel: https://winscp.net/eng/docs/ui_login_tunnel
+:uri-cyberduck-tunnel: https://trac.cyberduck.io/wiki/help/en/howto/sftp#ConnectviaSSHtunnelthroughbastionserver
 :uri-nginx-map: http://nginx.org/en/docs/http/ngx_http_map_module.html
 :uri-laravel: https://laravel.com
 :uri-pdo: https://www.php.net/manual/en/book.pdo.php
@@ -993,7 +995,8 @@ SSH public keys belonging to each user will also be accepted for login as well
 as their UQ password.
 
 With a UQ user account, you can also access your zone over SFTP using a client
-such as {uri-winscp}[WinSCP] or {uri-filezilla}[FileZilla].
+such as {uri-winscp}[WinSCP], {uri-cyberduck}[Cyberduck] or
+{uri-filezilla}[FileZilla].
 
 For these clients, use the internal hostname of your zone (ending in
 `.zones.eait.uq.edu.au`) and your UQ username and password to log in, and then
@@ -1031,7 +1034,14 @@ on your local machine, the SSH client will automatically open a connection to
 `mango.eait.uq.edu.au` and proxy your traffic through it, without you having
 to open up a second shell yourself.
 
-An equivalent to this feature is also available {uri-winscp-tunnel}[in WinSCP].
+An equivalent to this feature is also available {uri-winscp-tunnel}[in WinSCP]
+and {uri-cyberduck-tunnel}[Cyberduck]. Unfortunately, FileZilla does not have
+an equivalent.
+
+NOTE: The GlobalProtect VPN which UQ provides for students studying remotely
+      from overseas (particularly China) does *not* provide direct network
+      access to zones. We recommend using the `ProxyJump` feature in
+      conjunction with GlobalProtect.
 
 === When things go wrong
 
