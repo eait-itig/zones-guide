@@ -1101,10 +1101,10 @@ Setting up `ProxyJump` for {uri-cyberduck-tunnel}[Cyberduck] requires editing
 the `+~/.ssh/config+` file, in the same way as for commandline usage of SSH.
 
 On MacOS, after opening a Terminal window, you can paste in the following
-command (changing `uqfoo` to your UQ username) to create this file:
+command to create this file (it will prompt you for your UQ username):
 
 ....
-mkdir ~/.ssh && printf "Host *.zones.eait.uq.edu.au\n  ProxyJump uqfoo@moss.labs.eait.uq.edu.au" > ~/.ssh/config
+curl https://stluc.manta.uqcloud.net/xlex/public/setup-ssh-proxy.sh | bash
 ....
 
 You will also need to be using version 7.7 or later of Cyberduck.
