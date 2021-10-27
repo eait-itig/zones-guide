@@ -1021,27 +1021,94 @@ your SSH connection via `mango.eait.uq.edu.au` or `moss.labs.eait.uq.edu.au`.
 "Proxying" can simply mean logging into `mango` or `moss` first and using the
 `ssh` command there; or you can set up SSH client features such as `ProxyJump`.
 
-For example, on MacOS or Linux, if you add this to your `+~/.ssh/config+` file:
+Many SFTP clients such as WinSCP and Cyberduck also have equivalent features
+to `ProxyJump` which can be enabled. FileZilla, however, does not have any such
+feature.
 
-[source,ssh]
-....
-Host *.zones.eait.uq.edu.au
-  ProxyJump uqfoo@mango.eait.uq.edu.au
-....
-
-Then whenever you use a command such as `ssh root@foobar.zones.eait.uq.edu.au`
-on your local machine, the SSH client will automatically open a connection to
-`mango.eait.uq.edu.au` and proxy your traffic through it, without you having
-to open up a second shell yourself.
-
-An equivalent to this feature is also available {uri-winscp-tunnel}[in WinSCP]
-and {uri-cyberduck-tunnel}[Cyberduck]. Unfortunately, FileZilla does not have
-an equivalent.
+In the following sections you can find advice for setting up `ProxyJump` or an
+equivalent feature with individual clients.
 
 NOTE: The GlobalProtect VPN which UQ provides for students studying remotely
       from overseas (particularly China) does *not* provide direct network
       access to zones. We recommend using the `ProxyJump` feature in
       conjunction with GlobalProtect.
+
+==== Commandline SSH on MacOS or Linux
+
+Oon MacOS or Linux, if you add this to your `+~/.ssh/config+` file:
+
+[source,ssh]
+....
+Host *.zones.eait.uq.edu.au
+  ProxyJump uqfoo@moss.labs.eait.uq.edu.au
+....
+
+Then whenever you use a command such as `ssh root@foobar.zones.eait.uq.edu.au`
+on your local machine, the SSH client will automatically open a connection to
+`moss.labs.eait.uq.edu.au` and proxy your traffic through it, without you having
+to open up a second shell yourself.
+
+==== WinSCP
+
+WinSCP has {uri-winscp-tunnel}[a configuration option for tunneling] which works
+well for zones. When creating a new site, enter your regular SSH hostname for
+your zone, and press the "Advanced" button:
+
+.Example WinSCP configuration
+image::winscp-session.png[Screenshot,600]
+
+Then select the "Tunnel" option under "Connection":
+
+.Example WinSCP tunnel configuration
+image::winscp-tunnel.png[Screenshot,600]
+
+Enter the "Host name" here as `moss.labs.eait.uq.edu.au` or
+`mango.eait.uq.edu.au`, and then enter your UQ username (and password if
+needed) in the fields below it.
+
+==== PuTTY
+
+With PuTTY, you can set up a Proxy configuration using PLink.
+
+NOTE: PLink does not allow Duo MFA authentication to work properly with the
+      proxy host. As Duo or public key authentication is now required for
+      external SSH, we only recommend using this approach with public key
+      authentication via Pageant.
+
+First, create a PuTTY session and set the host name to the SSH hostname for
+your zone:
+
+.Example PuTTY session config
+image::putty-session.png[Screenshot,600]
+
+Then choose the "Proxy" category under "Connection" on the left-hand side:
+
+.Example PuTTY proxy config
+image::putty-proxy.png[Screenshot,600]
+
+On this screen:
+
+1. Select "Local" as the Proxy type
+2. Set the proxy hostname to `moss.labs.eait.uq.edu.au` or `mango.eait.uq.edu.au`
+3. Set the proxy port to 22
+4. Add your UQ username in the "username" field
+5. Enter the "Telnet command or local proxy command" as
+   `plink.exe %user@%proxyhost -P %proxyport -nc %host:%port`
+
+==== Cyberduck
+
+Setting up `ProxyJump` for {uri-cyberduck-tunnel}[Cyberduck] requires editing
+the `+~/.ssh/config+` file, in the same way as for commandline usage of SSH.
+
+On MacOS, after opening a Terminal window, you can paste in the following
+command (changing `uqfoo` to your UQ username) to create this file:
+
+....
+mkdir ~/.ssh && printf "Host *.zones.eait.uq.edu.au\n  ProxyJump uqfoo@moss.labs.eait.uq.edu.au" > ~/.ssh/config
+....
+
+You will also need to be using version 7.7 or later of Cyberduck.
+
 
 === When things go wrong
 
