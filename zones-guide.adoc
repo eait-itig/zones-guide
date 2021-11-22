@@ -715,8 +715,8 @@ TYPE        USED  LIMIT
 ram          384    512
 ....
 
-Staff and student accounts start with an automatic default limit of 512 MB (the
-size of a single `z1-standard` zone).
+Student accounts start with an automatic default limit of 512 MB (the
+size of a single `z1-standard` zone). Staff accounts start at 1024 MB.
 
 You can request an increase in your account limit by contacting the
 mailto:helpdesk@eait.uq.edu.au[EAIT IT helpdesk]. Please make sure to include
