@@ -636,7 +636,34 @@ TIP: Metadata keys which are optional for a given image can generally be
 
 ==== `jupyter` image
 
-See <<webproj-mdata>> above.
+[options="header"]
+|===
+| Key         | Required?       | Description   | Value format    | Example
+
+| `owner`     | yes
+| UQ users who "owns" the Jupyter notebook (user which it runs as)
+| Single UQ username | `uqfoobar`
+
+| `uq_users`  | yes
+| UQ users who should be allowed to log into the zone. Must include the owner.
+| List of UQ usernames separated by spaces | `uqfoobar uqxyz s4xxxx`
+
+|===
+
+See also <<webproj-mdata>> above. Note that the `owner` user must be repeated
+in the `uq_users` metadata, so a typical invocation will look like:
+
+[source,shell-session]
+....
+$ triton inst create \
+    --metadata owner=uqfoobar \
+    --metadata uq_users=uqfoobar \
+    jupyter ...
+....
+
+If you add additional users to `uq_users`, they will have the same full level
+of access to the notebook as the owner (which includes being able to open
+a Jupyter Terminal as the owner's user).
 
 ==== `x2go-xfce4` image
 
