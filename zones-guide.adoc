@@ -3636,7 +3636,27 @@ while the last does not. It works in this particular case because this file
 (`image.jpg`) is located in `/uqfoo/public`. The `public` directory is always
 allowed to be read via HTTPS from anywhere on the Internet.
 
+Manta also supports "pre-signed" expiring URLs which allow anybody in
+possession of the link to access a non-public object until the link expires.
+These can be produced using the `msign` tool:
 
+[source,shell-session]
+....
+$ msign /uqfoo/stor/blah.txt
+https://stluc.manta.uqcloud.net/uqfoo/stor/blah.txt?algorithm=ECDSA-SHA256&expires=1644300698&keyId=...
+
+$ curl 'https://stluc.manta.uqcloud.net/uqfoo/stor/blah.txt?algorithm=ECDSA-SHA256&expires=1644300698&keyId=...'
+....
+
+You can also use pre-signed URLs to upload new objects:
+
+[source,shell-session]
+....
+$ msign -m PUT /uqfoo/stor/blah.txt
+https://stluc.manta.uqcloud.net/uqfoo/stor/blah.txt?algorithm=ECDSA-SHA256&expires=1644300698&keyId=...
+
+$ curl -T local-filename.txt 'https://stluc.manta.uqcloud.net/uqfoo/stor/blah.txt?algorithm=ECDSA-SHA256&expires=1644300698&keyId=...'
+....
 
 === UQ LDAP for user/group information
 
