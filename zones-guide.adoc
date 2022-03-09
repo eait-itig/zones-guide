@@ -3658,6 +3658,28 @@ https://stluc.manta.uqcloud.net/uqfoo/stor/blah.txt?algorithm=ECDSA-SHA256&expir
 $ curl -T local-filename.txt 'https://stluc.manta.uqcloud.net/uqfoo/stor/blah.txt?algorithm=ECDSA-SHA256&expires=1644300698&keyId=...'
 ....
 
+==== Installing Manta tools on your own machine
+
+You can install the Manta commandline tools directly on your machine by using
+the Node.js package manager `npm`.
+
+The stock version from Joyent is recommended, which you can install using
+the command `npm install -g manta`.
+
+On `mango` and `moss` we automatically set up environment variables for you
+based on your key. In particular, the `MANTA_KEY_ID` environment variable will
+need to be set in the same way as `SDC_KEY_ID` (you can copy how we do
+this from `/etc/profile.d/sdc.sh` on `mango` or `moss` if you like).
+
+The information you will need about our particular Manta installation is
+as follows:
+
+`MANTA_URL`:: `https://stluc.manta.uqcloud.net`
+`MANTA_USER`:: `uqfoobar` (your UQ username)
+
+NOTE: You do not need to set these environment variables up or install the
+      Manta tools if you just want to use the SFTP bridge.
+
 ==== Manta compute jobs
 
 You can also use the tools `mjob` and `mlogin` to run compute jobs on Manta
