@@ -3658,6 +3658,102 @@ https://stluc.manta.uqcloud.net/uqfoo/stor/blah.txt?algorithm=ECDSA-SHA256&expir
 $ curl -T local-filename.txt 'https://stluc.manta.uqcloud.net/uqfoo/stor/blah.txt?algorithm=ECDSA-SHA256&expires=1644300698&keyId=...'
 ....
 
+==== Manta compute jobs
+
+You can also use the tools `mjob` and `mlogin` to run compute jobs on Manta
+storage nodes. Both of these tools allow you to run commands inside a transient
+zone on the storage node which is storing a particular object, with the object
+mounted directly into the zone as a normal file.
+
+The `mlogin` command creates an interactive shell in the transient zone and
+attaches it to your terminal, whereas `mjob` allows you to construct arbitrary
+map and reduce steps to process the data, and operates on multiple objects at
+once.
+
+Note that the transient zone created is always based on a fixed native SmartOS
+image (it is not an LX/Linux zone). There is not currently any ability to
+customise this.
+
+As an example, if I have a large tarball in Manta and want to download one
+specific file from it without having to download the entire thing, I could
+use an `mlogin` session to extract it:
+
+[source,shell-session]
+....
+[xlex@home ~]$ mls -l ~~/stor/126339b0.tar.gz
+-rwxr-xr-x 1 xlex   37541788863 Feb 01  2021 126339b0.tar.gz
+
+[xlex@home ~]$ mlogin ~~/stor/126339b0.tar.gz
+ * created interactive job -- 26926120-9c28-6576-8fed-b9cb2f3329a9
+ * waiting for session... \ established
+
+xlex@manta # du -sh $MANTA_INPUT_FILE
+35G     /manta/xlex/stor/126339b0.tar.gz
+
+xlex@manta # time gtar -I pigz -zxv --occurrence -f $MANTA_INPUT_FILE var/lib/mysql/ib_logfile1
+var/lib/mysql/ib_logfile1
+
+real    1m56.301s
+user    0m17.333s
+sys     0m6.905s
+
+xlex@manta # mput -f var/lib/mysql/ib_logfile1 ~~/stor/
+/xlex/stor/ib_logfile1              [==========================>] 100%  48.00MB
+
+xlex@manta # exit
+
+
+ * remote process exited
+ * cleaning up resources...
+ * session complete
+
+[xlex@home ~]$ mget -O ~~/stor/ib_logfile1
+/xlex/stor/ib_logfile1         [=================>] 100%  48.00MB  12.76MB/s     3s
+....
+
+As you can see, the Manta tools (such as `mput`) are also available inside the
+transient zones, and are automatically authenticated as the user who created
+the job. The variable `$MANTA_INPUT_FILE` always gives the path to the target
+object mounted into the zone (but it also exists at a predictable path in
+`/manta/`). It's an ordinary file on disk, which means you can seek around in
+it and read from it at the full speed of the local disk.
+
+One good example of using `mjob` is to apply `grep` to a large number of log
+files, followed by some kind of aggregation. Let's search a month of web server
+logs for a particular host and path, and count requests by the username of the
+user who was logged in:
+
+[source,shell-session]
+....
+$ mfind -t o /hermes/stor/weblogs/2022/03 | wc -l
+560
+
+$ mfind -t o /hermes/stor/weblogs/2022/03 | \
+  mjob create -w \
+    -m 'fgrep internal.eait.uq.edu.au | fgrep /isrdb | json -ag req.username || true' \
+    -r 'sort | uniq -c | sort -n'
+60ec5596-fc25-c092-d5af-9f23cd7568ea
+added 563 inputs to 60ec5596-fc25-c092-d5af-9f23cd7568ea
+
+$ mget $(mjob outputs 60ec5596-fc25-c092-d5af-9f23cd7568ea)
+     83 uqtmcca3
+     86 uqtwigg1
+     87 uqdkosov
+     95 csdreeve
+     97 e4skimba
+     98 uqabaxte
+    177 uqdlaws1
+    702 uqmbull2
+    807 uqrnewpo
+....
+
+This task can run though over 500GB of logs in less than a minute, because it
+processes all of the objects in parallel across as many Manta storage nodes as
+possible. Of course, a dedicated database will almost always match or beat the
+performance of this approach, but its advantage lies in the ability to simply
+dump the log files into storage and apply arbitrary queries later, without
+having to plan indexes or formatting in advance.
+
 === UQ LDAP for user/group information
 
 For applications run by UQ staff members which require access to more detailed
