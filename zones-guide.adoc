@@ -464,20 +464,18 @@ The table below is truncated to show just a few of each major type.
 
 ....
 SHORTID   NAME                   VERSION   FLAGS  OS       TYPE          PUBDATE
-221635c4  base-64                18.1.0    P      smartos  zone-dataset  2018-04-08
-5a513a46  base-multiarch         18.1.0    P      smartos  zone-dataset  2018-04-08
-c193a558  base-64-lts            18.4.0    P      smartos  zone-dataset  2019-01-21
+cfa9c88e  base-64                20.3.0    P      smartos  zone-dataset  2020-10-01
+1d05e788  base-64-lts            20.4.0    P      smartos  zone-dataset  2021-01-11
 
 19aa3328  alpine-3               20170303  P      linux    lx-dataset    2017-03-03
-7b5981c4  ubuntu-16.04           20170403  P      linux    lx-dataset    2017-04-03
 3dbbdcca  centos-7               20180323  P      linux    lx-dataset    2018-03-23
 63d6e664  debian-9               20180404  P      linux    lx-dataset    2018-04-04
-1246aee0  ubuntu-18.04           20191115  P      linux    lx-dataset    2019-11-15
+c720139e  ubuntu-20.04           20220118  IP     linux    lx-dataset    2022-01-18
 
-7858da72  ubuntu-krb5            1.0.4     IP     linux    lx-dataset    2020-01-16
-c83d1030  webproject             3.0.4     IP     linux    lx-dataset    2020-01-21
-da39262c  jupyter                1.0.3     IP     linux    lx-dataset    2020-02-11
-91cca3be  x2go-xfce4             1.0.1     IP     linux    lx-dataset    2020-02-20
+da011c21  ubuntu-krb5            2.0.0     IP     linux    lx-dataset    2022-01-18
+17c1426f  webproject             3.4.11    IP     linux    lx-dataset    2022-02-20
+bcf2d194  jupyter                2.1.5     IP     linux    lx-dataset    2022-04-01
+fd15ed26  x2go-xfce4             1.1.0     IP     linux    lx-dataset    2021-07-27
 ....
 
 The list is also broken up into sections so we can talk about each one.
@@ -638,15 +636,19 @@ TIP: Metadata keys which are optional for a given image can generally be
 
 [options="header"]
 |===
-| Key         | Required?       | Description   | Value format    | Example
+| Key          | Required?       | Description   | Value format    | Example
 
-| `owner`     | yes
-| UQ users who "owns" the Jupyter notebook (user which it runs as)
+| `owner`      | yes
+| UQ user who "owns" the Jupyter notebook (user which it runs as)
 | Single UQ username | `uqfoobar`
 
-| `uq_users`  | yes
+| `uq_users`   | yes
 | UQ users who should be allowed to log into the zone. Must include the owner.
 | List of UQ usernames separated by spaces | `uqfoobar uqxyz s4xxxx`
+
+| `jupyter_lab`| no
+| Whether to use JupyterLab instead of the Jupyter Classic Notebook.
+| `yes` (default) or `no` | `yes`
 
 |===
 
