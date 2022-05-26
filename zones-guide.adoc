@@ -3435,7 +3435,7 @@ Based on the records from 2019, most users who opt to use the redaction feature
 use it to hide their full name or course enrolment information.
 
 If your application requires certain fields to be present and valid (e.g. the
-e-mail address) and your zone is subject to consent, you should consider
+email address) and your zone is subject to consent, you should consider
 detecting when the `__redacted__` string is substituted for a real value and
 informing users that further information is required and why you require it.
 
@@ -3499,10 +3499,10 @@ or keytab.
 === E-mail submission via EAIT mailhubs
 
 Zones are not generally permitted outgoing traffic to the Internet on ports 25
-or 587 for sending e-mail traffic.
+or 587 for sending email traffic.
 
-Instead, in order to comply with University policies regarding outgoing e-mail,
-all zones are required to send their e-mail via the EAIT mail hubs, which can be
+Instead, in order to comply with University policies regarding outgoing email,
+all zones are required to send their email via the EAIT mail hubs, which can be
 reached using the following settings:
 
 Hostname:: `mailhub.eait.uq.edu.au`
@@ -3511,15 +3511,15 @@ TLS/SSL:: StartSSL allowed but not required
 Authentication:: None
 
 Please take note of the fact that authentication is not required, and *do not
-place your UQ username and password in your e-mail sending configuration*.
+place your UQ username and password in your email sending configuration*.
 
 ==== Rate limits
 
-All zones are subject to a default e-mail rate limit of 4 emails per minute.
+All zones are subject to a default email rate limit of 4 emails per minute.
 
 If you exceed your rate limit, then the mailhubs will reject the mail -- they
-will not queue e-mail on your behalf past your allowed rate. This means that
-whatever software you use for sending e-mail should be capable of queueing
+will not queue email on your behalf past your allowed rate. This means that
+whatever software you use for sending email should be capable of queueing
 itself upon rejection or failure by the SMTP server.
 
 If you have to deal with software which is not capable of internal queueing,
@@ -3535,16 +3535,42 @@ TIP: If you have need to be regularly sending more than 4 emails/minute for a
 ==== Sender domains and SPF
 
 We recommend that you send email from an email address of the form:
-`noreply@account-zone.uqcloud.net`.
+`account-zone@uqcloud.net`.
 
 The EAIT mailhubs will allow outgoing emails with envelope sender and `From`
-addresses of the pattern `*@account-zone.uqcloud.net`. If you attempt to send
-email with a different envelope sender or `From` address, the mailhubs will
-silently alter your email to originate from `noreply@account-zone.uqcloud.net`
-instead.
+addresses of the pattern `account-zone@uqcloud.net` or `account@uqcloud.net`.
+If you attempt to send email with a different envelope sender or `From` address,
+the mailhubs will silently alter your email to originate from
+`account-zone@uqcloud.net` instead.
+
+If you use one of the acceptable sender addresses for your zone, the "friendly
+name" of the sender will not be altered. If the mailhubs have to change the
+sender address on your mail, then they will change the "friendly name" as well,
+to the name of your zone.
 
 If you want your application to be able to send email from a different address,
 please contact mailto:helpdesk@eait.uq.edu.au[Helpdesk].
+
+==== Receiving mail
+
+You can receive email for `account-zone@uqcloud.net` or `account@uqcloud.net`
+by running an MTA such as Postfix on one of your zones.
+
+This is primarily intended to allow your zone to process bounce messages from
+email it has sent. When you receive a permanent failure bounce message about
+a particular email address, your application should stop attempting to send
+email to that address.
+
+If you create a zone with the CNS service tag `mail` on your account, we will
+forward all email for `account@uqcloud.net` and `account-*@uqcloud.net` to
+the zones with that tag.
+
+Otherwise, for `account-zone@uqcloud.net` we will also attempt to deliver mail
+to `account-zone.zones.eait.uq.edu.au` on port 25.
+
+You should configure your MTA to consider itself the final destination for mail
+bound for `@uqcloud.net`, and add mailboxes or aliases for your account name
+and zones.
 
 === Manta object storage
 
@@ -3789,7 +3815,7 @@ All zones are allowed access outgoing to this service automatically, but you
 will need to contact the ITS team responsible for the LDAP service to request
 credentials for your application to log in.
 
-To do this, e-mail the mailto:itsupportdesk@its.uq.edu.au[ITS support desk]
+To do this, email the mailto:itsupportdesk@its.uq.edu.au[ITS support desk]
 explaining what data you require access to and for what purpose.
 
 
@@ -3830,7 +3856,7 @@ allowed to be broader than incoming rules.
 
 To request additional firewall rules to be added for you zone, contact
 mailto:helpdesk@eait.uq.edu.au[the EAIT IT helpdesk] and include the following
-information in your e-mail:
+information in your email:
 
  * The name of your zone, in the full `account-zonename` format
  * The exact protocols and port numbers required (e.g. TCP port 9898)
