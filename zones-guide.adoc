@@ -373,17 +373,15 @@ running the command `triton pkg list`. It will output a table like this one:
 ....
 $ triton pkg list
 SHORTID   NAME         MEMORY  SWAP  DISK  VCPUS
-fbcd1fb1  s1-standard    512M    4G    8G      -
-30576ce1  s1-large         1G    8G   16G      -
-703756ac  s1-xlarge        2G   16G   32G      -
-9a1bc31b  s1-2xlarge       4G   32G   64G      -
-18788a7b  z1-small       384M    1G   10G      -
-4d9c02a1  z1-standard    512M    1G   10G      -
-fa587e7c  z1-large         1G    4G   20G      -
-51ebcce0  z1-xlarge        2G    8G   40G      -
-ffbc80c9  z1-2xlarge       4G   16G   80G      -
-6c316255  z1-3xlarge       8G   16G  200G      -
-109554f9  z1-4xlarge      16G   32G  350G      -
+dbebb9a0  z1-xtiny       128M  512M    5G      -
+639a1b7b  z1-tiny        256M  512M    5G      -
+48e4704d  z1-small       512M    1G   10G      -
+05c99a68  z1-standard      1G    4G   20G      -
+f02f1704  z1-large         2G    8G   40G      -
+3224d86d  z1-xlarge        4G   16G   80G      -
+ae628680  z1-2xlarge       8G   32G  150G      -
+c474518c  z1-3xlarge      16G   32G  300G      -
+fddced88  z1-4xlarge      32G   64G  600G      -
 ....
 
 Packages are generally referred to by their name (in the second column). If
@@ -421,14 +419,15 @@ The following table summarises the CPU time limits for the Z1 group packages:
 
 [options="header"]
 |===
-| Package name   | Guaranteed CPU | CPU cap | Burst ratio
-| `z1-small`     |   2%           |  80%    | 32x
-| `z1-standard`  |   3%           | 100%    | 30x
-| `z1-large`     |   6%           | 150%    | 23x
-| `z1-xlarge`    |  13%           | 250%    | 19x
-| `z1-2xlarge`   |  26%           | 400%    | 15x
-| `z1-3xlarge`   |  52%           | 650%    | 12x
-| `z1-4xlarge`   | 104%           | 800%    | 8x
+| Package name   | Guaranteed CPU | CPU cap  | Burst ratio
+| `z1-tiny`      |   4%           |   60%    | 16.3x
+| `z1-small`     |   7%           |   90%    | 12.2x
+| `z1-standard`  |  15%           |  150%    | 10.2x
+| `z1-large`     |  29%           |  200%    |  6.8x
+| `z1-xlarge`    |  59%           |  350%    |  6.0x
+| `z1-2xlarge`   | 118%           |  500%    |  4.3x
+| `z1-3xlarge`   | 235%           |  800%    |  3.4x
+| `z1-4xlarge`   | 470%           | 1200%    |  2.5x
 |===
 
 Percentages in the table are all phrased as percentage of a single logical CPU
@@ -754,7 +753,7 @@ generally happy to accomodate any usage that is for a legitimate purpose
 related to coursework or research at the University.
 
 We do not generally allow the accounts of individuals to provision more than
-8 GB (8192 MB) of memory in zones. To get a higher limit than 8 GB, we usually
+16 GB (16384 MB) of memory in zones. To get a higher limit than 16 GB, we usually
 recommend the creation of a "group account" for your project -- see the section
 <<Group accounts and managing access>> for further details.
 
@@ -3879,7 +3878,7 @@ differences are:
  * Group accounts can be used by more than one person;
  * Group accounts are not necessarily terminated when the people who created
    them leave the University; and
- * Group accounts may be given a quota higher than the regular limit (8 GB) for
+ * Group accounts may be given a quota higher than the regular limit (16 GB) for
    individual accounts.
 
 The people who manage a group account are generally referred to as the account's
