@@ -740,11 +740,11 @@ You can see your current limits and usage using the command
 ....
 $ triton account limits
 TYPE        USED  LIMIT
-ram          384    512
+ram          512   1024
 ....
 
-Student accounts start with an automatic default limit of 512 MB (the
-size of a single `z1-standard` zone). Staff accounts start at 1024 MB.
+Student accounts start with an automatic default limit of 1024 MB (the
+size of a single `z1-standard` zone). Staff accounts start at 2048 MB (2 GB).
 
 You can request an increase in your account limit by contacting the
 mailto:helpdesk@eait.uq.edu.au[EAIT IT helpdesk]. Please make sure to include
