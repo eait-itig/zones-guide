@@ -464,15 +464,15 @@ The table below is truncated to show just a few of each major type.
 ....
 SHORTID   NAME                   VERSION   FLAGS  OS       TYPE          PUBDATE
 cfa9c88e  base-64                20.3.0    P      smartos  zone-dataset  2020-10-01
-1d05e788  base-64-lts            20.4.0    P      smartos  zone-dataset  2021-01-11
+85d0f826  base-64-lts            21.4.1    P      smartos  zone-dataset  2022-07-11
 
-19aa3328  alpine-3               20170303  P      linux    lx-dataset    2017-03-03
+697731ba  alpine-3               20230111  IP     linux    lx-dataset    2023-01-11
 3dbbdcca  centos-7               20180323  P      linux    lx-dataset    2018-03-23
-63d6e664  debian-9               20180404  P      linux    lx-dataset    2018-04-04
-c720139e  ubuntu-20.04           20220118  IP     linux    lx-dataset    2022-01-18
+551e60da  debian-10              20230111  IP     linux    lx-dataset    2023-01-11
+1b3be5ca  ubuntu-20.04           20230111  IP     linux    lx-dataset    2023-01-11
 
-da011c21  ubuntu-krb5            2.0.0     IP     linux    lx-dataset    2022-01-18
-17c1426f  webproject             3.4.11    IP     linux    lx-dataset    2022-02-20
+79080cf6  ubuntu-krb5            2.0.2     IP     linux    lx-dataset    2023-01-04
+e90a6319  webproject             4.0.3     IP     linux    lx-dataset    2023-01-11
 bcf2d194  jupyter                2.1.5     IP     linux    lx-dataset    2022-04-01
 fd15ed26  x2go-xfce4             1.1.0     IP     linux    lx-dataset    2021-07-27
 ....
@@ -507,7 +507,7 @@ log in and use Jupyter straight away without any additional work.
 For advanced users who want to set up the system themselves from scratch, the
 *base OS images* or the `ubuntu-krb5` image are recommended. The `ubuntu-krb5`
 image has only one additional piece of software installed compared to the base
-`ubuntu-18.04` image: a plugin to allow UQ usernames and passwords to log in
+`ubuntu-20.04` image: a plugin to allow UQ usernames and passwords to log in
 over SSH.
 
 For users in the middle, and especially those developing web applications, the
@@ -1358,7 +1358,7 @@ Zones based on `webproject` can also be used for other web frameworks or
 databases not included on this list, and it comes with other language
 runtimes installed as well (e.g. Go).
 
-The image is based on Ubuntu (18.04 in image version 3.x), meaning that most
+The image is based on Ubuntu (20.04 in image version 4.x), meaning that most
 advice and material you will find online for settings things up on Ubuntu or
 Debian Linux distros can be applied.
 
@@ -1947,30 +1947,30 @@ Users of Python programs in zones sometimes need a specific release version of
 Python rather than just any available.
 
 In all Ubuntu-based images (including webproject), there is a "system" Python
-(usually a slightly older version -- e.g. Python 3.6 in Ubuntu 18.04) which
+(usually a slightly older version -- e.g. Python 3.8 in Ubuntu 20.04) which
 cannot be removed or upgraded. You can, however, add additional Python versions
-under different names, which is the recommended method (e.g. Python 3.9 will be
-named `python3.9`, not `python` or `python3` -- both of those will still point
+under different names, which is the recommended method (e.g. Python 3.11 will be
+named `python3.11`, not `python` or `python3` -- both of those will still point
 at the system Python).
 
-As of webproject version 3.3.0, the latest stable Python (at time of writing,
-this was Python 3.9) is pre-installed alongside the "system" Python in
+As of webproject version 4.0, the latest stable Python (at time of writing,
+this was Python 3.11) is pre-installed alongside the "system" Python in
 this manner.
 
 If you just want to use the latest stable Python instead of the default system
-python, you can invoke it directly as `python3.9` (install packages with
-`pip3.9`).
+python, you can invoke it directly as `python3.11` (install packages with
+`python3.11 -m pip`).
 
 When using `uwsgi` for Python web frameworks, a given `uwsgi` binary can only
 work with one version of Python at a time. We include a separate copy of
 `uwsgi` for each version of Python pre-installed in the webproject image.
 
 To change which `uwsgi` is in use, you can modify the symlink at
-`/usr/local/bin/uwsgi` -- for example, to change to the Python 3.9 `uwsgi`:
+`/usr/local/bin/uwsgi` -- for example, to change to the Python 3.11 `uwsgi`:
 
 [source,shell-session]
 ....
-root@foobaz:~# ln -sf uwsgi3.9 /usr/local/bin/uwsgi
+root@foobaz:~# ln -sf uwsgi3.11 /usr/local/bin/uwsgi
 ....
 
 After doing this, you will need to restart the `uwsgi` systemd service:
@@ -1986,7 +1986,7 @@ You can check which version is currently the target of the symlink by using
 [source,shell-session]
 ....
 root@foobaz:~# ls -la /usr/local/bin/uwsgi
-lrwxrwxrwx   1 root     root           8 Feb 15 07:54 /usr/local/bin/uwsgi -> uwsgi3.9
+lrwxrwxrwx   1 root     root           8 Feb 15 07:54 /usr/local/bin/uwsgi -> uwsgi3.11
 ....
 
 ==== Installing other Python versions
@@ -2001,7 +2001,7 @@ can compile wheels and add-in modules):
 
 [source,shell-session]
 ....
-root@foobaz:~# apt-get install python3.8 python3.8-dev
+root@foobaz:~# apt-get install python3.10 python3.10-dev
 ....
 
 This will install Python 3.8 as a new version of Python, but will not remove
@@ -2017,9 +2017,9 @@ it to a versioned name and re-create the symlink afterwards.
 [source,shell-session]
 ....
 root@foobaz:~# rm -f /usr/local/bin/uwsgi
-root@foobaz:~# python3.8 -m pip install uwsgi
-root@foobaz:~# mv /usr/local/bin/uwsgi{,3.8}
-root@foobaz:~# ln -s uwsgi3.8 /usr/local/bin/uwsgi
+root@foobaz:~# python3.10 -m pip install uwsgi
+root@foobaz:~# mv /usr/local/bin/uwsgi{,3.10}
+root@foobaz:~# ln -s uwsgi3.10 /usr/local/bin/uwsgi
 ....
 
 This will replace `uwsgi` on the system with a version linked against Python
@@ -2032,10 +2032,10 @@ is currently linked against, you can use `ldd`:
 [source,shell-session]
 ....
 root@foobaz:~# ldd $(which uwsgi) | grep python
-        libpython3.6m.so.1.0 => /usr/lib/x86_64-linux-gnu/libpython3.6m.so.1.0 (0x00007fffed400000) <1>
+        libpython3.8.so.1.0 => /lib/x86_64-linux-gnu/libpython3.8.so.1.0 (0x00007fffee400000) <1>
 ....
-<1> We can see here that the binary is linked against `libpython3.6m.so.1.0`,
-    which belongs to Python 3.6 (in this case, the system Python).
+<1> We can see here that the binary is linked against `libpython3.8.so.1.`,
+    which belongs to Python 3.8 (in this case, the system Python).
 
 You can read more about using uwsgi to run Python web applications such as Flask
 or Django in the section <<python-uwsgi>>.
@@ -2520,12 +2520,7 @@ First, we set up the environment:
 [source,shell-session]
 ....
 root@foobar:~# cd /var/www/uwsgi
-root@foobar:/var/www/uwsgi# virtualenv -p $(which python3.6) .
-Running virtualenv with interpreter /usr/bin/python3.6
-Using base prefix '/usr'
-New python executable in /var/www/uwsgi/bin/python3.6
-Also creating executable in /var/www/uwsgi/bin/python
-Installing setuptools, pkg_resources, pip, wheel...done.
+root@foobar:/var/www/uwsgi# python3.8 -m venv ./
 ....
 
 And then activate the new environment and install Flask:
@@ -2533,7 +2528,7 @@ And then activate the new environment and install Flask:
 [source,shell-session]
 ....
 root@foobaz:/var/www/uwsgi# . ./bin/activate
-(uwsgi)root@foobaz:/var/www/uwsgi# pip install flask
+(uwsgi)root@foobaz:/var/www/uwsgi# python -m pip install flask <1>
 Collecting flask
   Downloading Flask-1.1.1-py2.py3-none-any.whl (94 kB)
      |████████████████████████████████| 94 kB 4.7 MB/s
@@ -2553,6 +2548,8 @@ Collecting MarkupSafe>=0.23
 Installing collected packages: MarkupSafe, Jinja2, itsdangerous, click, Werkzeug, flask
 Successfully installed Jinja2-2.11.1 MarkupSafe-1.1.1 Werkzeug-0.16.1 click-7.0 flask-1.1.1 itsdangerous-1.1.0
 ....
+<1> Invoking `python` as a bare command with no version will only work inside
+    a virtualenv, and will start the correct version of Python for that venv.
 
 We'll be using the following script as our application, which we will save
 as `/var/www/uwsgi/app2.py`:
@@ -2676,12 +2673,7 @@ First, we set up the environment:
 [source,shell-session]
 ....
 root@foobar:~# cd /var/www/uwsgi
-root@foobar:/var/www/uwsgi# virtualenv -p $(which python3.6) .
-Running virtualenv with interpreter /usr/bin/python3.6
-Using base prefix '/usr'
-New python executable in /var/www/uwsgi/bin/python3.6
-Also creating executable in /var/www/uwsgi/bin/python
-Installing setuptools, pkg_resources, pip, wheel...done.
+root@foobar:/var/www/uwsgi# python3.8 -m venv .
 ....
 
 And then activate the new environment and install Django:
@@ -2689,7 +2681,7 @@ And then activate the new environment and install Django:
 [source,shell-session]
 ....
 root@foobaz:/var/www/uwsgi# . ./bin/activate
-(uwsgi)root@foobaz:/var/www/uwsgi# pip install django
+(uwsgi)root@foobaz:/var/www/uwsgi# python -m pip install django
 Collecting django
   Downloading Django-3.0.3-py3-none-any.whl (7.5 MB)
      |████████████████████████████████| 7.5 MB 22.9 MB/s
