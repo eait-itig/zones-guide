@@ -462,19 +462,21 @@ Unlike packages, there are a lot of different images available to choose from.
 The table below is truncated to show just a few of each major type.
 
 ....
-SHORTID   NAME                   VERSION   FLAGS  OS       TYPE          PUBDATE
-cfa9c88e  base-64                20.3.0    P      smartos  zone-dataset  2020-10-01
-85d0f826  base-64-lts            21.4.1    P      smartos  zone-dataset  2022-07-11
+SHORTID   NAME                   VERSION          FLAGS  OS       TYPE          PUBDATE
+cfa9c88e  base-64                20.3.0           P      smartos  zone-dataset  2020-10-01
+66e68481  base-64-lts            21.4.1-20230208  IP     smartos  zone-dataset  2023-02-08
 
-697731ba  alpine-3               20230111  IP     linux    lx-dataset    2023-01-11
-3dbbdcca  centos-7               20180323  P      linux    lx-dataset    2018-03-23
-551e60da  debian-10              20230111  IP     linux    lx-dataset    2023-01-11
-1b3be5ca  ubuntu-20.04           20230111  IP     linux    lx-dataset    2023-01-11
 
-79080cf6  ubuntu-krb5            2.0.2     IP     linux    lx-dataset    2023-01-04
-e90a6319  webproject             4.0.3     IP     linux    lx-dataset    2023-01-11
-bcf2d194  jupyter                2.1.5     IP     linux    lx-dataset    2022-04-01
-fd15ed26  x2go-xfce4             1.1.0     IP     linux    lx-dataset    2021-07-27
+697731ba  alpine-3               20230111         IP     linux    lx-dataset    2023-01-11
+ab71e9fe  almalinux-9            20230127         P      linux    lx-dataset    2023-01-27
+4e60ee8e  debian-11              20230127         P      linux    lx-dataset    2023-01-27
+55595e1a  ubuntu-22.04           20230127         P      linux    lx-dataset    2023-01-27
+75a4648b  ubuntu-20.04           20230208         IP     linux    lx-dataset    2023-02-08
+
+c2a96f69  ubuntu-krb5            2.0.3            IP     linux    lx-dataset    2023-02-08
+48f6373b  webproject             4.0.7            IP     linux    lx-dataset    2023-02-08
+e385bd82  jupyter                3.0.5            IP     linux    lx-dataset    2023-02-08
+fd15ed26  x2go-xfce4             1.1.0            IP     linux    lx-dataset    2021-07-27
 ....
 
 The list is also broken up into sections so we can talk about each one.
@@ -798,6 +800,7 @@ TIP: Metadata keys which can be changed after creation may only be checked
      only checked once an hour), so it may take some time for your change to
      have an effect on the zone.
 
+[[changing-networks]]
 ==== Changing networks
 
 Changing which *networks* a zone is using can be done through the subcommands
@@ -1325,12 +1328,84 @@ A reboot will help to prevent any further knock-on issues later.
 
 ==== No DNS entry
 
-TODO: failed login due to no DNS entry (provisioned on fabric only)
+If you try to SSH to a zone you may receive this message:
 
-==== SSH daemon not running
+[source,shell-session]
+....
+$ ssh uqtest-foobar.zones.eait.uq.edu.au
+ssh: Could not resolve hostname uqtest-foobar.zones.eait.uq.edu.au: no address associated with name
+....
 
-TODO: failed login due to disabled/crashed/badly configured SSH daemon
+This means that your zone is not being listed in DNS. If the zone is very new
+(i.e. created in the last few minutes), try waiting a little longer. If more
+than 5 minutes have passed since you created the zone and this message persists,
+it may not have the correct networking configuration.
 
+You can check the network interfaces on a particular zone using the command
+`triton inst nic list`:
+
+[source,shell-session]
+....
+$ triton inst nic list testzone
+IP                 MAC                STATE    NETWORK
+172.23.83.152/22   90:b8:d0:90:40:b1  running  0ce96a79
+192.168.128.16/22  90:b8:d0:18:12:f6  running  dbac7eb6
+....
+
+If we compare the `NETWORK` column to the output of `triton network ls`:
+
+[source,shell-session]
+....
+$ triton network ls
+SHORTID   NAME               SUBNET            GATEWAY        FABRIC  VLAN  PUBLIC
+dbac7eb6  My-Fabric-Network  192.168.128.0/22  192.168.128.1  true    2     false
+b10a8f1c  zones              -                 -              -       -     true
+....
+
+We can see that this zone has NICs on both the `zones` network and
+`My-Fabric-Network`. If we look at `foobar`, however, the zone we were having
+trouble reaching over SSH:
+
+[source,shell-session]
+....
+$ triton inst nic list testzone
+IP                 MAC                STATE    NETWORK
+192.168.128.16/22  90:b8:d5:f9:01:a8  running  dbac7eb6
+....
+
+We can see that it only has a NIC on `My-Fabric-Network`, not one on the `zones`
+network. This is why it has not been listed in DNS and why we cannot reach it
+for SSH.
+
+See the section <<changing-networks>> for an example of how to fix this by
+adding a new NIC to this zone.
+
+==== Denied due to `AllowGroups`
+
+If you create a new local user on the `ubuntu-krb5` image, or any descendant
+of it (e.g. `webproject`), and try to use it for SSH login, you may be denied
+with the following message in `journalctl`:
+
+....
+User testuser from 1.2.3.4 not allowed because none of user's groups are listed in AllowGroups
+....
+
+The configuration for the SSH daemon (`/etc/ssh/sshd_config`) in the
+`ubuntu-krb5` image has the following directive in it:
+
+[source,ssh-config]
+....
+AllowGroups root sysadm
+....
+
+This means that only members of the groups `root` and `sysadm` are allowed to
+SSH into the zone. This is set to help prevent accidentally exposing local users
+with weak credentials to the network.
+
+If you want a local user to be able to log in via SSH, ensure they have a strong
+password or use public key authentication. Then either delete the `AllowGroups`
+line from `/etc/ssh/sshd_config` (and run `systemctl reload ssh`) or add one
+of the user's groups to the `AllowGroups` line.
 
 == Getting around the "webproject" image [[webproject]]
 
