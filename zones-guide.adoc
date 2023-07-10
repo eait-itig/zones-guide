@@ -33,6 +33,10 @@
 :uri-django-rub: https://docs.djangoproject.com/en/3.1/ref/contrib/auth/#django.contrib.auth.backends.RemoteUserBackend
 :uri-ghost: https://hub.docker.com/_/ghost
 :uri-chat: https://chat.uq.edu.au/_matrix/client/#/room/#uqcloud:chat.uq.edu.au
+:uri-yaml: https://yaml.org/
+:uri-aperture-conds: https://github.com/TritonDataCenter/node-aperture#conditions
+:uri-manta-actions: https://github.com/TritonDataCenter/manta-muskie/blob/master/docs/internal/acuserguide.md#actions
+:uri-cloudapi: https://github.com/TritonDataCenter/sdc-cloudapi/blob/master/docs/index.md#account
 
 = UQcloud zones guide
 :author: Alex Wilson (EAIT ITIG)
@@ -4298,7 +4302,7 @@ Hardware failure (chassis swap):: A hardware component in the CN has failed
 
 === Realtime information on `chat.uq.edu.au`
 
-You can join the Matrix room {uri-chat}[#uqcloud:chat.uq.edu.au] for real-time
+You can join the Matrix room {uri-chat}[`#uqcloud:chat.uq.edu.au`] for real-time
 updates on the progress of outages and reboots. A bot in the room posts
 progress updates, and you can ask questions about ongoing issues.
 
@@ -4466,8 +4470,511 @@ zones on them, and set up the website on top.
 [appendix]
 == Role-based access control and sub-users [[rbac]]
 
+When we set up group accounts for UQcloud, we give all of the assigned
+administrator users full control of the group account and all of its resources,
+both those in Triton (zones, networks etc) and in Manta.
+
+It is possible to instead assign only partial access to an account's resources
+to a user: for example, you can assign read-only access to somebody so that
+they can view information about zones on the account but not make changes. You
+can also give them access only to specific zones or parts of the Manta directory
+structure.
+
+This can also be used with automation tools, to allow a programmatic tool to
+have limited access to an account to carry out its tasks (e.g. allowing a
+web application to read and write objects in a directory in Manta).
+
+The subsystem which is used to accomplish all of these goals is named
+"Role-based access control" (RBAC).
+
 === Accounts, sub-users and roles
-=== Writing aperture rules
+
+The RBAC subsystem deals with 4 key concepts: principals, roles, policy and
+resources.
+
+ * _Principals_ are users of the system (whether human or automaton);
+ * _Resources_ are the things which they are trying to access; and
+ * _Roles_ and _policy_ together decide which principals can access which
+   resources and how.
+
+Roles, policy and resources all exist only within one account. They control
+the access to that account's resources.
+
+Principals may be a member of a certain role. That role then has policies
+applied to it which specify which actions the role members may take against
+which resources.
+
+[svgbob]
+....
+┌──────────────────────────────────┐
+│Principals                        │  Special cases
+│                                  │  - anonymous
+│ ┌─────────┐ ┌─────────┐          │  - machine
+│ │Accounts │ │Sub-users│          │
+│ └─────────┘ └─────────┘          │
+│                                  │
+└───┬──────────────────────────────┘
+    │
+    │
+    ▼
+┌────────────┐                        Special cases
+│Roles       │                        - administrator
+└───┬────────┘
+    │
+    ▼
+┌────────────┐
+│Policies    │
+└───┬────────┘
+    │
+    ▼
+┌────────────┐
+│Resources   │
+└────────────┘
+....
+
+For example:
+
+ * The group account `abcd1234` is a course account for the course ABCD1234
+ * We want the user `uqxyz` to have full administrator access to the `abcd1234`
+   account
+ * So, we create a role named `administrator` in `abcd1234`, and add `uqxyz`
+   as a member
+ * Then we set policy on the `administrator` role giving it full access to all
+   resources
+
+Another example:
+
+ * The user `uqxyz` has created a zone on their account. It needs to
+   periodically upload log files into Manta.
+ * We register the zone as a machine principal, and add it to a role named
+   `log-file-uploader`
+ * Then we set policy on the `log-file-uploader` role giving it the ability
+   to write objects into `/uqxyz/stor/logs` in Manta.
+
+Principals are divided into two main types: _accounts_ (top-level users, either
+human users or group accounts); and _sub-users_, which exist only within a
+particular account.
+
+Account principals are managed by UQ and ITIG -- they are either UQ users
+or group accounts. Sub-users can be created and managed by anybody who has
+an existing account to place them under.
+
+Two special kinds of sub-users also exist: the `anonymous` sub-user (which is
+a principal which can be used to give non-authenticated access to resources),
+and the `machine` sub-user (which is a principal used to give access to
+automated tasks on zones on the account).
+
+As well as these two special sub-users, there is also one special role name,
+`administrator`. Any role named `administrator` on an account always confers
+full access to all resources within that account, regardless of whether it has
+any actual policy set.
+
+=== Managing RBAC configuration
+
+You can see a quick summary of all of the RBAC configuration for a given
+account using the command `triton rbac info`. This is a typical output from
+a newly created course account:
+
+[source,shell-session]
+....
+$ triton --act-as=abcd1234 rbac info
+users (0): <1>
+foreign accounts (4): <2>
+    coursemgr: role [administrator]
+    uqxyz: role [administrator]
+roles (1): <3>
+    administrator: no policies <5>
+policies (0): <4>
+....
+<1> The "users" section contains all sub-users managed by this account. There
+    are none in this example. They are listed along with the roles they
+    are members of.
+<2> "Foreign accounts" are other top-level accounts which are members of roles
+    on this account. They are listed along with the roles they are members of
+    (e.g. `uqxyz` in this example is a member of the role `administrator`).
+<3> The "roles" section contains all of the roles on this account, and lists
+    their attached policy, if any.
+<4> The "policies" section contains saved policy objects, which can be shared
+    between multiple roles, but are most typically just added to a single role.
+<5> This role has no policies, but since it's named `administrator`, it will
+    automatically grant full control of all resources.
+
+And a more complicated example:
+
+[source,shell-session]
+....
+users (1):
+    machine (no ssh keys): role [machine] <1>
+foreign accounts (3):
+    coursemgr: role [administrator]
+    uqxyz: role [administrator]
+roles (2):
+    administrator: no policies
+    machine: policy machine-policy <2>
+policies (1):
+    machine-policy rules: <3>
+        CAN getobject /abcd1234/stor/shared/*
+        CAN getdirectory /abcd1234/stor/shared AND /abcd1234/stor/shared/*
+....
+<1> This is how the special `machine` sub-user appears. On this account, it is
+    a member of the role named `machine`
+<2> This indicates that the `machine` role has the `machine-policy` policy
+    applied to it.
+<3> These are the actual policy rules, specifying what actions can be taken
+    on what resources.
+
+As well as the usual administrator role, this course account has been set up
+to automatically grant its zones read-only access to part of the Manta
+directory tree belonging to the course. The section following this one explains
+the format of policy rules.
+
+The commands to manage these entities all appear under the `triton rbac` command
+sub-tree:
+
+[source,shell-session]
+....
+$ triton rbac
+Role-based Access Control (RBAC) commands.
+
+Usage:
+    triton rbac [OPTIONS] COMMAND [ARGS...]
+    triton rbac help COMMAND
+
+Options:
+    -h, --help          Show this help message and exit.
+
+Commands:
+    help (?)            Help on a specific sub-command.
+    info                Show current RBAC state.
+    apply               Apply an RBAC configuration.
+
+  RBAC Resources:
+    users               List RBAC users.
+    user                Show, add, edit and delete RBAC users.
+    keys                List RBAC user SSH keys.
+    key                 Show, upload, and delete RBAC user SSH keys.
+    policies            List RBAC policies.
+    policy              Show, add, edit and delete RBAC policies.
+    roles               List RBAC roles.
+    role                Show, add, edit and delete RBAC roles.
+....
+
+Several of the add/edit commands will start your preferred commandline text
+editor to supply details, while others will prompt for each field one at a time.
+For text editor input, the commands use a subset of the YAML format:
+
+[source,yaml]
+....
+name:    machine
+members:
+  - type:    subuser
+    default: true
+    id:      bbcfa424-e365-457b-90b0-add0be8b3926
+    login:   machine
+policies:
+  - id:      c8c82d66-2d96-41d4-92a3-6af43348e99b
+    name:    machine-policy
+....
+
+You can {uri-yaml}[read more about YAML online] for further details.
+
+When creating new sub-users on UQcloud, you should leave all fields except
+the name and email address blank, and fill the email address with a value of
+the form `subuser@account`. Insert random data for the "password" field: it is
+required but will never be used for anything.
+
+Once created, roles and policy in Triton and Manta _may_ immediately begin to
+be applied to new requests. Due to internal caching, it may take some time
+before all new requests are being processed using the new rules. This is
+especially true with Manta, where (if a recent denial has happened) you can
+expect the old rules to continue to be used for some requests for up to 10
+minutes following a change.
+
+=== Writing Aperture rules
+
+The language used for writing rules in policy objects is called "Aperture".
+Each Aperture rule appears on its own line, and it specifies something that
+a principal is allowed to do. There are no "deny" aperture rules to make
+exceptions from another rule: once the system encounters a rule that matches
+and authorises an action, that action is allowed.
+
+The basic format of an Aperture rule is `CAN <action> <resource> WHEN <condition>`:
+
+[svgbob]
+....
+                    X                    X
+                    ▲                    ▲
+                    │                    │
+                    │                    │
+        ┌─────────┐ │   ┌────────────┐   │            ┌────────────┐
+CAN ──► │ ACTION  ├─+─► │ RESOURCE   ├───+► WHEN  ──► │ CONDITION  │
+        └─────────┘     └────────────┘                └────────────┘
+....
+
+Each of the action, resource, and condition sections may be a single identifer
+or a list, and the resource and condition sections may be left off entirely
+(more about what that means later).
+
+A list of identifiers may look like `X AND Y`, `X, Y AND Z` etc. For example,
+a rule that allows reading and writing to a Manta object may begin with
+`CAN getobject AND putobject ...`.
+
+Actions are short strings, generally of the form `verbobject`. For example, in
+Manta rules, `getdirectory` is an action which represents an HTTP GET request
+reading the contents of a Manta directory. In Triton rules, `rebootmachine` is
+an action allowing the principal to reboot a zone or VM.
+
+Manta and Triton actions support different resources, but both use a URL-style
+format to specify what resource is being targetted. Both also support the
+special resource `*` (a single asterisk), which specifies all possible resources
+under the account.
+
+For example, `CAN getobject *` is a rule which allows the principal to read
+all objects in Manta which belong to the account. Similarly,
+`CAN rebootmachine *` would allow the principal to reboot any zone/VM belonging
+to the account.
+
+Conditions can be used to refine the situations where the rule is applied. A
+commonly used example is the `overwrite` condition in Manta rules. For example,
+ the rule `CAN putobject *` would allow the principal to write to any Manta
+object. If we change this to `CAN putobject * WHEN overwrite = false`, this
+limits them to uploading new objects (i.e. they cannot overwrite any existing
+ones), which is often useful for allowing zones to upload data but not delete
+or modify it later.
+
+Conditions may be combined using the `AND` and `OR` operators, negated with
+`NOT`, and there are also {uri-aperture-conds}[some more advanced variations
+available].
+
+Some useful information you can match in conditions includes:
+
+ * Identity of the zone/VM which is using the `machine` sub-user;
+ * The client IP address which is performing the operation;
+ * Time/day the operation is being carried out;
+ * Certain HTTP headers (e.g. `Referer`, useful for anti-leeching);
+ * Tags applied to the target zone/VM in Triton.
+
+=== Role tags
+
+If the "resources" section of an Aperture rule is left out, the implied target
+of the rule is a "role tag". This is probably the most confusing part of the
+Triton/Manta RBAC design, and if your usage is covered by what is shown above
+you can entirely ignore it.
+
+Role tags are a special type of tag, named after a role, which can be applied
+to resources in Triton and Manta. They are useful if you need to:
+
+ * Target a flexible subset of resources that don't already have something
+   in common you can target (e.g. Manta objects that are mixed up in the same
+   directory with other objects you don't want to match);
+ * Allow "inheritance" of the tag upon creation of new resources (e.g.
+   'read your own writes' type functionality); or
+ * Have a shared policy object in multiple roles that targets different
+   resources in each.
+
+When Triton and Manta encounter an Aperture rule with no resource target, they
+check the name of the role which caused that rule to be processed. Then they
+query an internal database of role-tags for the resource being accessed, and
+check for one which has the same name as the name of the role. If it exists,
+then the rule matches.
+
+To add a role-tag to a resource in Triton, you use the `triton rbac role-tags`
+family of commands (see the full output of `triton rbac --help`).
+
+In Manta, you can add role-tags to an object or directory using the `mchmod`
+command. You can also add them during upload by using the `--role-tag=` option
+to `mput` and similar commands.
+
+=== Non-default role membership
+
+As well as "default" roles, which are always active and have their rules applied,
+a user can also be a "non-default" member of a role. Non-default members must
+explicitly "take up" the role in order to benefit from its rules.
+
+Taking up a role can be done using the `-r` or `--role=` options to the `triton`
+command, or the `--role=` option on most Manta commands like `mls`, `mget` etc.
+Only commands which you run with one of these options will have the role's
+rules applied.
+
+This allows you to have something akin to a "sudo" mode for account access --
+for example, you can add users to a default role that gives read-only access,
+and add them as a non-default member of the `administrator` role at the same
+time. Then they can view all resources normally, but if they run e.g.
+`triton inst rm` to delete an instance it will be denied until they add
+`--role=administrator` to take up the non-default membership. This can be
+useful to prevent mistakes, both manual and automated.
+
+We generally recommend that if you add the `machine` subuser to a highly
+privileged role like `administrator` to use it in scripts, you make it a
+non-default membership to help reduce the chances of accidentally deleting
+the wrong zone or removing your own access to it.
+
+=== Actions and resources for Triton
+
+:fn-triton-path: pass:c,q[footnote:triton-path[The CloudAPI path to this resource, exactly as would be used in a request to perform this action, e.g. `/account/machines/<UUID>`. Note that aliases like `/my/X` are *not* resolved before this match takes place -- you must supply the URL exactly as the client will use it, or use `*` and conditions instead.]]
+
+Basic global metadata actions for Triton (we recommend adding these to any roles that confer access to other Triton operations, to ensure that tools and libraries work correctly):
+
+[options="header"]
+|===
+| Action            | Description                                 | Resource
+| `getaccount`      | Read account metadata                       | None (use `*`)
+| `getprovisioninglimits` | Read account quota and usage          | None (use `*`)
+| `getconfig`       | Read global configuration (default fabric)  | None (use `*`)
+| `listdatacenters` | Read global list of datacenters             | None (use `*`)
+| `listservices`    | Read global list of Triton services         | None (use `*`)
+|===
+
+Basic actions for zones/VMS in Triton:
+
+[options="header"]
+|===
+| Action            | Description                                 | Resource
+| `createmachine`   | Create a new zone                           | None (use `*`)
+| `listmachines`    | List all zones on the account               | None (use `*`)
+| `headmachines`    | Count number of machines on the account     | None (use `*`)
+| `getmachine`      | Retrieve metadata about a zone              | Triton path{fn-triton-path}
+| `headmachine`     | Retrieve metadata about a zone              | Triton path
+| `deletemachine`   | Delete a zone                               | Triton path
+| `stopmachine`     | Stop a zone                                 | Triton path
+| `startmachine`    | Start a zone                                | Triton path
+| `rebootmachine`   | Reboot a zone (start+stop)                  | Triton path
+| `resizemachine`   | Resize a zone to a new package              | Triton path
+| `renamemachine`   | Allows changing a zone's alias              | Triton path
+| `execmachinecommand` | Allows using `triton inst exec` to run commands on a zone | Triton path
+| `connectmachinevnc` | Allows connecting to a VM's VNC console (only for KVM/bhyve)   | Triton path
+|===
+
+Common read-only actions (usually also required to be able to provision new zones):
+
+[options="header"]
+|===
+| Action            | Description                                 | Resource
+| `listimages`      | List all images available                   | None (use `*`)
+| `getimage`        | Read image metadata                         | Triton path{fn-triton-path}
+| `listpackages`    | List all packages available                 | None (use `*`)
+| `getpackage`      | Read package metadata                       | Triton path
+| `listnetworks`    | List all networks available                 | None (use `*`)
+| `getnetwork`      | Read  network metadata                      | Triton path
+|===
+
+Actions for managing zone tags and metadata:
+
+[options="header"]
+|===
+| Action                    | Description                                | Resource
+| `updatemachinemetadata`   | Update metadata keys                       | Triton path{fn-triton-path}
+| `listmachinemetadata`     | Read metadata keys                         | Triton path
+| `deletemachinemetadata`   | Delete a specific metadata key             | Triton path
+| `deleteallmachinemetadata` | Delete all metadata                       | Triton path
+| `addmachinetags`          | Add additional tags                        | Triton path
+| `replacemachinetags`      | Replace existing tags' values              | Triton path
+| `listmachinetags`         | Read all tags                              | Triton path
+| `getmachinetag`           | Read a specific tag value                  | Triton path
+| `deletemachinetag`        | Delete a specific tag                      | Triton path
+| `deletemachinetags`       | Delete all tags                            | Triton path
+|===
+
+You can see a full list of possible actions in the {uri-cloudapi}[Triton CloudAPI documentation]. Each section heading below "Accounts" is of the form "RouteName (METHOD /resource/path)". The "RouteName" in lower case is the name of the RBAC action to use to match that operation.
+
+Standard conditions available:
+
+:fn-always-typed: pass:c,q[footnote:always-typed[This is a dynamic field, so the type always has to be specified in Aperture with e.g. `machine_tag_test::string = 'abc'`]]
+
+[options="header"]
+|===
+| Condition variable | Type       | Description            | Example value
+| `method`           | `string`   | HTTP method of request | `'GET'`, `'PUT'`
+| `activeRoles`      | `[string]` | Same-account roles active for auth  | `['administrator', 'machine']`
+| `activeXAcctRoles` | `[string]` | Cross-account roles active for auth | `['administrator', 'machine']`
+| `date`             | `date`     | | `2023-01-01`
+| `day`              | `dayofweek`| | `Tuesday`
+| `time`             | `time`     | | `13:06`
+| `datacenter`       | `string`   | The Triton 'data center ID' (always `'gps-1'` on UQcloud) | `'gps-1'`
+| `sourceip`         | `ip`       | IP address making the request (may be an internal UQ private IP) | `1.2.3.4`
+| `user-agent`       | `string`   | User-Agent header from request | `'Mozilla/5.0 ...'`
+| `ip`               | `ip`       | IP address of the target machine | `1.2.3.4`
+| `tag_X`            | `any`      | Contains value of tag `X` on the target machine{fn-always-typed} |
+|===
+
+=== Actions and resources for Manta
+
+Basic actions on Manta objects and directories:
+
+:fn-manta-path: pass:c,q[footnote:manta-path[A full Manta path, e.g. `/user/stor/foobar`]]
+:fn-snaplink: pass:c,q[footnote:snaplink[Creating a snaplink also requires `getobject` on the target of the link]]
+
+[options="header"]
+|===
+| Action            | Description                                 | Resource
+| `getobject`       | Read object data and metadata               | Manta path{fn-manta-path}
+| `getdirectory`    | List directory contents and metadata        | Manta path
+| `putobject`       | Create object, overwrite object, update metadata | Manta path
+| `putdirectory`    | Create directory, update dir metadata       | Manta path
+| `putlink`         | Create snaplink{fn-snaplink}                | Manta path
+| `deleteobject`    | Delete an object                            | Manta path
+| `deletedirectory` | Delete an (empty) directory                 | Manta path
+|===
+
+Standard conditions available:
+
+[options="header"]
+|===
+| Condition variable | Type       | Description            | Example value
+| `owner`            | `string`   | Owner of target object | `'uqxyz'`
+| `fromjob`          | `boolean`  | Is the request being made as part of a job? | `true`, `false`
+| `overwrite`        | `boolean`  | Is the request overwriting an existing object or metadata? | `true`, `false`
+| `parentdirectory`  | `string`   | Manta path of the parent dir | `/uqxyz/stor`
+| `method`           | `string`   | HTTP method of request | `'GET'`, `'PUT'`
+| `activeRoles`      | `[string]` | Same-account roles active for auth  | `['administrator', 'machine']`
+| `activeXAcctRoles` | `[string]` | Cross-account roles active for auth | `['administrator', 'machine']`
+| `date`             | `date`     | | `2023-01-01`
+| `day`              | `dayofweek`| | `Tuesday`
+| `time`             | `time`     | | `13:06`
+| `region`           | `string`   | The manta 'region' (always `'stluc'` on UQcloud) | `'stluc'`
+| `sourceip`         | `ip`       | IP address making the request (may be an internal UQ private IP) | `1.2.3.4`
+| `user-agent`       | `string`   | User-Agent header from request | `'Mozilla/5.0 ...'`
+| `referer`          | `string`   | Referer header from request | `https://uq.edu.au/...`
+|===
+
+Actions related to Manta jobs:
+
+:fn-job-path: pass:c,q[footnote:job-path[A Manta job path, e.g. `/uqxyz/jobs/<UUID>`]]
+
+[options="header"]
+|===
+| Action            | Description                                 | Resource
+| `createjob`       | Create a new job                            | None (use `*`)
+| `managejob`       | Add input keys to job, cancel, end input    | Job path{fn-job-path}
+| `listjobs`        | List all jobs                               | None (use `*`)
+| `getjob`          | Retrieve job status, errors, inputs and outputs | Job path{fn-job-path}
+|===
+
+=== Machine sub-user conditions
+
+Any rule which applies to the special `machine` sub-user on either Triton or
+Manta will have access to additional conditions related to the zone that has
+authenticated:
+
+[options="header"]
+|===
+| Condition variable | Type       | Description            | Example value
+| `machine_uuid`     | `string`   | UUID of the zone which auth'd | `'ab65009f-5492-4d8e-b3b1-4c70e5470bd9'`
+| `machine_alias`    | `string`   | Alias of the zone which auth'd | `'thing'`
+| `machine_tag_X`    | `any`      | Contains value of tag `X` on the zone which auth'd{fn-always-typed} |
+|===
+
+As an example of using the `machine_tag_` conditions, we could set a tag on
+certain machines in our account:
+
+[source,shell-session]
+....
+$ triton inst tag set foobar control=true
+$ triton inst tag set baz control=true
+....
+
+If we then added a rule such as `CAN rebootmachine * WHEN machine_tag_control::boolean = true`, only these two machines (`foobar` and
+`baz`) would be allowed to reboot other zones via this rule.
 
 [appendix]
 == Using Docker images with Triton [[docker]]
