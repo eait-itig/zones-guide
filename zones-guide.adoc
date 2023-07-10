@@ -4976,6 +4976,33 @@ $ triton inst tag set baz control=true
 If we then added a rule such as `CAN rebootmachine * WHEN machine_tag_control::boolean = true`, only these two machines (`foobar` and
 `baz`) would be allowed to reboot other zones via this rule.
 
+=== Machine sub-users on older zones
+
+On zones which are not made from very recent images, you will not automatically
+be given the correct environment variables to make use of the `machine` sub-user
+from within that zone.
+
+We recommend creating the file `/etc/profile.d/triton.sh` and filling it with:
+
+[source,bash]
+....
+export SDC_URL=https://cloudapi.gps-1.uqcloud.net
+export MANTA_URL=https://stluc.manta.uqcloud.net
+export SDC_ACCOUNT=$(mdata-get sdc:owner_uuid)
+export MANTA_USER=uqxyz <1>
+if [ -z "$SSH_AUTH_SOCK" ]; then
+  export SSH_AUTH_SOCK=/native/.zonecontrol/agent.sock
+  export SDC_USER=machine
+  export MANTA_SUBUSER=machine
+fi
+export SDC_KEY_ID=$(ssh-add -l | head -1 | awk '{print $2}')
+export MANTA_KEY_ID=$SDC_KEY_ID
+....
+<1> Change `uqxyz` here to your Triton account's name.
+
+After logging out and back in again, you should have the right environment to
+make use of the machine sub-user feature.
+
 [appendix]
 == Using Docker images with Triton [[docker]]
 
