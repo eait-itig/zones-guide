@@ -4149,9 +4149,40 @@ is fully created. They can do this by following the steps in the section
 When using zones for coursework teaching, it's often desirable to manage them
 in bulk and keep the set of zones running up to date with course enrolments.
 
+Many courses also like to provide course material in the zones used for
+teaching, such as template files for pracs and tutorials or add records to a
+database.
+
 UQCloud includes a tool specifically for managing this usecase,
 named "Coursemgr". This section will explain how Coursemgr works, what it can
 do, and how to get access for your course.
+
+=== What Coursemgr does
+
+Using coursemgr for teaching looks roughly like this:
+
+ * Before the semester begins, course staff prepare and check over the image
+   and settings to be used for course zones, by provisioning test zones for
+   staff and attempting the course material on them.
+ * At the beginning of semester, Coursemgr syncs up with enrolment data for
+   the course and begins creating student zones.
+ * Each week of the semester, Coursemgr checks enrolments again, adding new
+   zones for late enrolments as needed. This can also be done manually at any
+   time, and zones created for students who have dropped out can also be
+   deleted.
+ * After marking has concluded, the zones are deleted, with backups of all data
+   retained for at least the next 6-12 months.
+
+Zones can either be created on a 1-per-student individual basis, or zones can
+be allocated to teams of students using the "team" mode (see
+<<Team projects in coursemgr>>).
+
+Course material and customisations for the zones can either be included in the
+base image (set before the semester starts), or they can be added later via
+the <<Migrator script>> or bulk command tool in coursemgr. Customising the base
+image is best for large changes or new software, while the Migrator script is
+most appropriate for templates and data, especially if those should only be
+provided to students at a certain date rather than at the start of semester.
 
 === Student privacy and zones
 
@@ -4180,6 +4211,14 @@ names, or any identifiable information about a student in the name of a zone.
 Instead, if there is no other meaningful name for a zone (e.g. because it's just
 a particular student's personal instance), a random identifier should be used.
 
+Coursemgr handles this automatically, generating random names for the student
+zones it creates. The students can then visit the course page on coursemgr
+(https://coursemgr.uqcloud.net/infs1234) to find out the name of their assigned
+zone.
+
+.The student view of coursemgr, showing assigned zone details.
+image::coursemgr-student.png[Screenshot,600]
+
 When sharing zones between a group of students, clear communication must be made
 to all of the students involved about the nature of the zone as a shared
 resource, and the fact that they cannot expect privacy from the other students
@@ -4192,10 +4231,212 @@ by the system and can be used for support purposes or incident response. This
 too, should be clearly communicated by courses which require the use of zones
 for teaching activities.
 
-=== Student zones in course accounts
-=== Coursemgr settings (images, packages, etc)
-=== Team projects
+=== Course accounts and resources
 
+Coursemgr is set up to manage a particular type of group account (see also
+<<Group accounts and managing access>>), named after the course code and
+referred to as a "course account".
+
+For example, for the course TEST1234, the course account would be named
+`test1234`.
+
+Course accounts can contain infrastructure zones and data for the course, as
+well as zones run on behalf of students. They must be set up with RBAC rules
+allowing coursemgr to operate on the account. These rules may limit coursemgr
+to just manipulating student zones if additional safety for other infrastructure
+on the account is required (preventing coursemgr from being able to operate
+on them).
+
+Zones which are set up to run on behalf of students should have the metadata
+property `"owner"` set to the username of the student using that zone. This is
+managed automatically by coursemgr. As well as the owning student user, zones
+on course accounts should always be accessible to course staff (coordinators,
+lecturers and tutors).
+
+We generally aim to allow courses to occupy a maximum of around 384 GB
+of memory cap. This means that for a 200-student course, the maximum package we
+will generally set is a `z1-standard` (1GB memory cap). For a 100-student course,
+a `z1-large` (2GB memory cap) can be used. If you have requirements that don't
+fit in this footprint, you should discuss them with ITIG.
+
+=== Using coursemgr
+
+The staff view of coursemgr is accessed at the same URI as the student one:
+https://coursemgr.uqcloud.net/test1234 (replacing `test1234` with the relevant
+course code).
+
+The page presented to course staff looks like this:
+
+.Staff view of coursemgr
+image::coursemgr-staff-home.png[Screenshot,600]
+
+Along the top, below the UQ banner are a set of top-level navigation links
+in white text on a black band. These are the main "tabs" of coursemgr:
+
+Home:: The display presented above, a quick summary of the course status.
+Settings:: Changes the package, image and team/individual mode of the course.
+Staff:: Manages the list of course staff (lecturers, coordinators, tutors) and
+        provisions staff zones.
+Compare:: Compares current enrolment data to the set of zones in the account and
+          presents options for provisioning and deleting zones to reconcile
+          them.
+Admin:: A full list of all zones, along with tools for rebooting and deleting
+        them.
+Exec:: The bulk command execution tool, which allows running a shell command
+       across all course zones at once.
+Tarball:: The bulk tarball tool, which collects files from all zones at once and
+          uploads them into the course Manta account as TAR archives.
+
+At the beginning of semester, the *Settings* and *Staff* pages will be used
+to update the configuration of the course, select an image, and provison staff
+zones for testing course material.
+
+After semester has begun, the *Compare* page can be used to make sure zone
+provisioning is keeping up with course enrolment as needed.
+
+When supporting students using their zones, the *Admin* and *Exec* tools may
+be useful. The *Tarball* tool is most typically used for marking purposes, to
+collect a set of files in bulk from all the course zones at once.
+
+==== Using the Compare tool
+
+The *Compare* tool is divided into a number of sections based on the action
+recommended:
+
+Enrolled students with no zone provisioned:: This section contains a list of
+  enrolled students who don't have a zone yet. You can tick the checkbox next
+  to each one (or use the top checkbox to check all of them at once) and press
+  the blue _Provision Selected_ button at the top of the list to begin
+  provisioning.
+
+Scheduled for provision:: This section contains a list of students whose zones
+  are in the process of being created.
+
+Extra zones with known past records:: This section contains student zones
+  belonging to students who were previously enrolled in the course but are not
+  enrolled now. If they can be deleted (based on the requirements and timing of
+  your course), you can check the checkboxes next to each one and then press the
+  blue _Delete Selected_ button at the top of the list to delete them.
+
+Unknown extra zones:: These are zones on the account which do not belong to a
+  student and cannot be identified by coursemgr. You can select either to
+  _Delete_ or _Ignore_ each of these by clicking the relevant blue buttons.
+  Clicking the _Delete_ or _Ignore_ buttons does *not* cause the action to be
+  taken immediately: you must also press the _Confirm all selected actions_ red
+  button at the bottom to actually begin processing.
+
+Special zones:: These are zones on the account which have been marked as
+  "ignored" by coursemgr. Generally these are infrastructure zones that do not
+  belong to students.
+
+Zones provisioned for enrolled students:: This section lists all zones that are
+  already provisioned and belong to specific enrolled students. No actions are
+  available on this page for these zones.
+
+=== Team projects in coursemgr
+
+=== Migrator script
+
+In all images based on the `webproject` image (4.1.0 or later), there is a
+script named `uq-migrator` in `/usr/local/sbin`. This script is set to run
+periodically from `cron`. Its purpose is to enable zones on course accounts to
+automatically download files, .sql scripts and shell scripts from Manta and
+apply them to the running zone.
+
+The advantage of using this mechanism over other tools like the Bulk command
+executor is that migrations are automatically applied to new zones, and it
+includes mechanisms to automatically stop migrations being applied more than
+once to each zone.
+
+In order to use the migrator script, RBAC rules must be set to allow the
+`machine` subuser of the course account read-only access to
+`/course/stor/migrations` (see <<Course account policy templates>>). Then you
+may begin to upload migrations into Manta.
+
+Migrations are stored in a directory structure as shown:
+
+[svgbob]
+....
++-----------------------+
+|/course/stor/migrations|
++-----------------------+
+  |                 |---------------------+
+  v                                       v
++----+                                   +----+
+|2023|                                   |2022|
++----+                                   +----+
+  | +----------------+                     |
+  v                  v                     v
++---+               +---+                 ...
+|001|               |002|
++---+               +---+
+ |                   |
+ | +-------+         | +------------+
+ +>|db0.sql|         +>|files.tar.gz|
+ | +-------+         | +------------+
+ |                   |
+ | +-------+         | +-----+
+ +>|db1.sql|         +>|state|
+ | +-------+           +-----+
+ |
+ | +------------+
+ +>|files.tar.gz|
+ | +------------+
+ |
+ | +-----+
+ +>|state|
+   +-----+
+....
+
+At the top of `/course/stor/migrations` is a directory for each year. All
+zones created in that year will apply only the migrations in that year's
+directory. This is intended to allow for keeping old migrations from previous
+semesters of a course around without affecting new zones.
+
+Under each year directory is a numbered set of _migration directories_. Each
+migration has a separate directory, and they are always applied by zones in
+numerical order. For example, migration `001` will be applied before migration
+`002`, before migration `003` etc.
+
+Under each migration directory are the actual data files to be applied to the
+zone. These can be of 3 different types:
+
+Shell scripts (`.sh`):: These will be run as `root` on the zone.
+SQL scripts (`.sql`):: The name of the script without the `.sql` suffix will
+  be used as a database name for either MySQL or PostreSQL (whichever is
+  running). That database will be created if it does not yet exist, and then
+  the SQL script will be run inside it as a superuser.
+Tar archives (`.tar.gz`):: These will be extracted into the zone's filesystem,
+  as root at `/`.
+
+As well as the data files there is a `state` file. Since a migration may consist
+of multiple data files, to avoid a zone applying the migration before all the
+data files have been uploaded, zones check for this `state` file to determine
+whether the migration is "ready" or not.
+
+A migration that is ready to be applied must contain the string `ready` in this
+`state` file.
+
+==== Creating a migration
+
+An example of creating a migration with one SQL file:
+
+[source,shell-session]
+....
+$ mmkdir -p /infs1234/stor/migrations/2023/001
+$ pg_dump testdb | mput /infs1234/stor/migrations/2023/001/testdb.sql
+$ echo ready | mput /infs1234/stor/migrations/2023/001/state
+....
+
+These commands could be run on one of the staff zones for the course, if the
+recommended RBAC policy has been applied.
+
+==== Debugging migration issues
+
+The migrator writes log messages into `/var/log/uq-migrator.log`, including
+error output from commands.
+
+If a migration fails, it will continue to re-attempt it every half hour.
 
 == Outages and notifications
 
@@ -5002,6 +5243,54 @@ export MANTA_KEY_ID=$SDC_KEY_ID
 
 After logging out and back in again, you should have the right environment to
 make use of the machine sub-user feature.
+
+=== Course account policy templates
+
+The following policy objects are recommended for use with the `machine` subuser
+on course accounts:
+
+....
+policies:
+    machine-base rules: <1>
+        CAN getaccount *
+        CAN getconfig *
+        CAN listdatacenters *
+        CAN listservices *
+    machine-migrations rules: <2>
+        can getdirectory /infs1234/stor/migrations and /infs1234/stor/migrations/* <5>
+        can getobject /infs1234/stor/migrations/*
+    machine-staff-manta rules: <3>
+        CAN deleteobject * when machine_tag_staff::boolean = true
+        CAN getdirectory * when machine_tag_staff::boolean = true
+        CAN getobject * when machine_tag_staff::boolean = true
+        CAN putdirectory * when machine_tag_staff::boolean = true
+        CAN putobject * when machine_tag_staff::boolean = true
+        CAN deletedirectory * when machine_tag_staff::boolean = true
+        CAN putlink * when machine_tag_staff::boolean = true
+    machine-staff-triton rules: <4>
+        CAN execmachinecommand * when machine_tag_staff::boolean = true
+        CAN getmachine * when machine_tag_staff::boolean = true
+        CAN listimages * when machine_tag_staff::boolean = true
+        CAN listmachines * when machine_tag_staff::boolean = true
+        CAN rebootmachine * when machine_tag_staff::boolean = true
+        CAN startmachine * when machine_tag_staff::boolean = true
+        CAN stopmachine * when machine_tag_staff::boolean = true
+        CAN listpackages * when machine_tag_staff::boolean = true
+        CAN listnetworks * when machine_tag_staff::boolean = true
+....
+<1> The `machine-base` policy allows course zones to get basic account metadata,
+    which makes sure `zoneinit` can find out the right name for the course
+    account.
+<2> The `machine-migrations` policy allows the `uq-migrator` script (see
+    <<Migrator script>>) to read migrations from Manta.
+<3> The `machine-staff-manta` policy allows zones tagged with `staff: true` to
+    read and write data in the course Manta account. This is useful for
+    uploading course material and managing migrations.
+<4> The `machine-staff-triton` policy allows staff zones to perform basic
+    management of existing zones using the `triton` command. This is helpful
+    for providing support to students.
+<5> The string `infs1234` in rules should be replaced with the course account's
+    name.
 
 [appendix]
 == Using Docker images with Triton [[docker]]
