@@ -4401,7 +4401,8 @@ numerical order. For example, migration `001` will be applied before migration
 Under each migration directory are the actual data files to be applied to the
 zone. These can be of 3 different types:
 
-Shell scripts (`.sh`):: These will be run as `root` on the zone.
+Shell scripts (`.bash`):: These will be run as `root` on the zone using the
+  `bash` shell.
 SQL scripts (`.sql`):: The name of the script without the `.sql` suffix will
   be used as a database name for either MySQL or PostreSQL (whichever is
   running). That database will be created if it does not yet exist, and then
