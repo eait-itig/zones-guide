@@ -2997,23 +2997,23 @@ const dbName = 'test';
 
 app.set('trust proxy', 'loopback');
 
-app.get('/', function (req, res) {
-    MongoClient.connect(mongoUrl, function (err, client) {
+app.get('/', async function (req, res) {
+        const client = new MongoClient(mongoUrl);
+        await client.connect();
         const adminDb = client.db(dbName).admin();
-        adminDb.listDatabases(function (err, dbs) {
-            res.write('<table>');
-            res.write('<tr><th>Name</th><th>Size</th></tr>');
-            dbs.databases.forEach(function (db) {
-                res.write('<tr>');
-                res.write('<td>' + db.name + '</td>');
-                res.write('<td>' + db.sizeOnDisk + '</td>');
-                res.write('</tr>');
-            });
-            res.write('</table>');
-            res.end();
-            client.close();
-        });
-    });
+
+        const dbInfo = await adminDb.listDatabases();
+        var html = '<table>';
+        html += '<tr><th>Name</th><th>Size</th></tr>';
+        for (const db of dbInfo.databases) {
+                html += '<tr>';
+                html += '<td>' + db.name + '</td>';
+                html += '<td>' + db.sizeOnDisk + '</td>';
+                html += '</tr>';
+
+        }
+        res.send(html);
+
 })
 
 app.listen(port, () => console.log(`Example app listening on port ${port}!`))
