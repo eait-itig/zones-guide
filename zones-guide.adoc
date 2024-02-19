@@ -2740,7 +2740,8 @@ TIP: `nginx` will ensure that the `X-KVD-Payload` header (and other SSO
      pseudo-headers) comes only from the SSO module and not from the user
      request, even when no user is logged in or the ACL is set to `allow:*`.
      It's safe to simply trust the contents of these headers in your
-     application code.
+     application code as long as it runs inside `uwsgi` or only listens on
+     `localhost`.
 
 ==== Setting up Django
 
