@@ -912,6 +912,17 @@ snapshot of your zone (e.g. because you have accidentally done something that
 prevents it from starting up), please also contact
 mailto:helpdesk@eait.uq.edu.au[helpdesk].
 
+=== Account deletion
+
+Zones created under personal accounts (e.g. `s4xxx` or `uqxyz`) on UQcloud
+will be shut down if your UQ account becomes inactive (e.g. via graduation or
+resignation). Once they have been shut down for 30 days, they are subject to
+deletion.
+
+If you or your team or lab need a zone to be able to continue running even
+if staff or students leave or graudate, see the section
+<<Group accounts and managing access>>.
+
 == Accessing zones
 
 All zones may be accessed for administration purposes through the commandline,
