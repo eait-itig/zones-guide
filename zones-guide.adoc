@@ -37,6 +37,7 @@
 :uri-aperture-conds: https://github.com/TritonDataCenter/node-aperture#conditions
 :uri-manta-actions: https://github.com/TritonDataCenter/manta-muskie/blob/master/docs/internal/acuserguide.md#actions
 :uri-cloudapi: https://github.com/TritonDataCenter/sdc-cloudapi/blob/master/docs/index.md#account
+:uri-jupyter: https://jupyter.org/
 
 = UQcloud zones guide
 :author: Alex Wilson (EAIT ITIG)
@@ -466,21 +467,23 @@ Unlike packages, there are a lot of different images available to choose from.
 The table below is truncated to show just a few of each major type.
 
 ....
-SHORTID   NAME                   VERSION          FLAGS  OS       TYPE          PUBDATE
-cfa9c88e  base-64                20.3.0           P      smartos  zone-dataset  2020-10-01
-66e68481  base-64-lts            21.4.1-20230208  IP     smartos  zone-dataset  2023-02-08
+SHORTID   NAME            VERSION   FLAGS  OS       TYPE          PUBDATE
+41bd4100  minimal-64-lts  24.4.1    P      smartos  zone-dataset  2025-01-06
+2f1dc911  base-64-lts     24.4.1    P      smartos  zone-dataset  2025-01-06
 
+1d981eb4  almalinux-8     20250120  P      linux    lx-dataset    2025-01-20
+50c86f0f  almalinux-9     20250120  P      linux    lx-dataset    2025-01-20
+0b7d45d9  alpine-3        20250120  P      linux    lx-dataset    2025-01-20
+28f872d5  debian-12       20250120  P      linux    lx-dataset    2025-01-20
+e3870763  debian-11       20250120  P      linux    lx-dataset    2025-01-20
+3c2e3931  ubuntu-20.04    20250120  P      linux    lx-dataset    2025-01-20
+a7c2470a  ubuntu-22.04    20250120  P      linux    lx-dataset    2025-01-20
+610415d7  ubuntu-24.04    20250120  P      linux    lx-dataset    2025-01-20
+ce0592c2  void            20250205  IP     linux    lx-dataset    2025-02-05
 
-697731ba  alpine-3               20230111         IP     linux    lx-dataset    2023-01-11
-ab71e9fe  almalinux-9            20230127         P      linux    lx-dataset    2023-01-27
-4e60ee8e  debian-11              20230127         P      linux    lx-dataset    2023-01-27
-55595e1a  ubuntu-22.04           20230127         P      linux    lx-dataset    2023-01-27
-75a4648b  ubuntu-20.04           20230208         IP     linux    lx-dataset    2023-02-08
-
-c2a96f69  ubuntu-krb5            2.0.3            IP     linux    lx-dataset    2023-02-08
-48f6373b  webproject             4.0.7            IP     linux    lx-dataset    2023-02-08
-e385bd82  jupyter                3.0.5            IP     linux    lx-dataset    2023-02-08
-fd15ed26  x2go-xfce4             1.1.0            IP     linux    lx-dataset    2021-07-27
+2e75b787  ubuntu-krb5     20250207  IP     linux    lx-dataset    2025-02-06
+24d8415a  webproject      20250224  IP     linux    lx-dataset    2025-02-24
+4782547a  jupyter         20250225  IP     linux    lx-dataset    2025-02-25
 ....
 
 The list is also broken up into sections so we can talk about each one.
@@ -513,7 +516,7 @@ log in and use Jupyter straight away without any additional work.
 For advanced users who want to set up the system themselves from scratch, the
 *base OS images* or the `ubuntu-krb5` image are recommended. The `ubuntu-krb5`
 image has only one additional piece of software installed compared to the base
-`ubuntu-20.04` image: a plugin to allow UQ usernames and passwords to log in
+`ubuntu-24.04` image: a plugin to allow UQ usernames and passwords to log in
 over SSH.
 
 For users in the middle, and especially those developing web applications, the
@@ -1425,7 +1428,7 @@ of the user's groups to the `AllowGroups` line.
 == Getting around the "webproject" image [[webproject]]
 
 TIP: This section is specifically for users of zones based on the `webproject`
-     image (version 3.0.0 or later).
+     image (2025 or later).
 
 The `webproject` image is designed as a flexible starting point for a lot of
 common web application frameworks and databases. It comes pre-configured for
@@ -1448,7 +1451,7 @@ Zones based on `webproject` can also be used for other web frameworks or
 databases not included on this list, and it comes with other language
 runtimes installed as well (e.g. Go).
 
-The image is based on Ubuntu (20.04 in image version 4.x), meaning that most
+The image is based on Ubuntu (24.04 in 2025), meaning that most
 advice and material you will find online for settings things up on Ubuntu or
 Debian Linux distros can be applied.
 
@@ -1538,7 +1541,7 @@ We can see which frameworks are enabled by running the command
 ....
 root@foobar:~# webprojctl status
 enabled:
-available: php, uwsgi (python), nodejs, puma (ruby / rails), jsp, tomcat (jsp / java), dotnet, mysql, postgres, mongodb
+available: php, uwsgi312, uwsgi314 (python), nodejs, puma (ruby / rails), jsp, tomcat (jsp / java), dotnet, mysql, postgres, redis, vscode
 ....
 
 To enable or disable one of the frameworks, we can use the commands
@@ -1562,8 +1565,8 @@ REMINDERS:
 ....
 
 TIP: As indicated by the prompts above (`+root@foobar:~#+`), the `webprojctl`
-     command must be run as `root`. You can prefix the command with `sudo` if
-     logged in as an ordinary user.
+     command should be run as `root`. If you run it as your regular user, it
+     will attempt to become `root` automatically.
 
 After `webprojctl` enables a new framework for you it will sometimes print
 reminders about how to use the framework in question. These reminders are
@@ -1763,9 +1766,10 @@ might not have your own access control working yet). You can change the
 configuration to allow public access, however, or even restrict it further
 (e.g. to specific users or groups).
 
-The built-in Single Sign-On support is handled entirely within the `nginx`
-webserver component. Your application server does not have to be made aware
-of SSO or any of its consequences by default.
+The built-in Single Sign-On support is handled within the `nginx` webserver
+component, along with a "side-car" daemon named `webacld`. Your application
+server does not have to be made aware of SSO or any of its consequences by
+default.
 
 Configuring the default access rules for your website is done in the config
 file `/etc/nginx/conf.d/auth.conf`. This file contains a series of rules
@@ -2037,38 +2041,34 @@ Users of Python programs in zones sometimes need a specific release version of
 Python rather than just any available.
 
 In all Ubuntu-based images (including webproject), there is a "system" Python
-(usually a slightly older version -- e.g. Python 3.8 in Ubuntu 20.04) which
+(usually a slightly older version -- e.g. Python 3.12 in Ubuntu 24.04) which
 cannot be removed or upgraded. You can, however, add additional Python versions
-under different names, which is the recommended method (e.g. Python 3.11 will be
-named `python3.11`, not `python` or `python3` -- both of those will still point
+under different names, which is the recommended method (e.g. Python 3.14 will be
+named `python3.14`, not `python` or `python3` -- both of those will still point
 at the system Python).
 
-As of webproject version 4.0, the latest stable Python (at time of writing,
-this was Python 3.11) is pre-installed alongside the "system" Python in
-this manner.
+As of webproject 2025, the latest stable Python (Python 3.14) is pre-installed
+alongside the "system" Python in this manner.
 
 If you just want to use the latest stable Python instead of the default system
-python, you can invoke it directly as `python3.11` (install packages with
-`python3.11 -m pip`).
+python, you can invoke it directly as `python3.14` (install packages with
+`python3.14 -m pip`).
 
 When using `uwsgi` for Python web frameworks, a given `uwsgi` binary can only
 work with one version of Python at a time. We include a separate copy of
 `uwsgi` for each version of Python pre-installed in the webproject image.
 
-To change which `uwsgi` is in use, you can modify the symlink at
-`/usr/local/bin/uwsgi` -- for example, to change to the Python 3.11 `uwsgi`:
+The `webprojctl` tool can be used to select which version of `uwsgi` is in use
+for the provided Python versions. For example, to change to Python 3.14 `uwsgi`:
 
 [source,shell-session]
 ....
-root@foobaz:~# ln -sf uwsgi3.11 /usr/local/bin/uwsgi
+root@foobaz:~# webprojctl enable uwsgi314
 ....
 
-After doing this, you will need to restart the `uwsgi` systemd service:
-
-[source,shell-session]
-....
-root@foobaz:~# systemctl restart uwsgi
-....
+If you install additional versions of Python and build a `uwsgi` for them, you
+can also manually edit the symlink at `/usr/local/bin/uwsgi` to control which
+will be executed by the `systemd` service.
 
 You can check which version is currently the target of the symlink by using
 `ls -la`:
@@ -2076,8 +2076,29 @@ You can check which version is currently the target of the symlink by using
 [source,shell-session]
 ....
 root@foobaz:~# ls -la /usr/local/bin/uwsgi
-lrwxrwxrwx   1 root     root           8 Feb 15 07:54 /usr/local/bin/uwsgi -> uwsgi3.11
+lrwxrwxrwx   1 root     root           8 Feb 15 07:54 /usr/local/bin/uwsgi -> uwsgi3.12
 ....
+
+==== Installing Python packages and libraries
+
+When you want to install Python packages and libraries for your application to
+use, you should create a `virtualenv` or `venv` "environment". This is a
+directory where Python packages can be installed to keep them isolated from
+the rest of the system.
+
+This is especially important when using the system Python, as the packages and
+libraries installed system-wide with this Python version are used by many of
+the Ubuntu system components (such as the `apt` package manager). If you update
+these or remove them, it can render your zone unuseable.
+
+There are many good tutorials and information available online about creating
+and using virtual environments, as these are a standard part of Python
+development practice.
+
+In the default configuration in the `webproject` image, `uwsgi` is configured
+to activate a virtual environment at `/var/www/uwsgi/env` when running the
+example `app.py`. You can use this environment as a starting point if you wish,
+or delete it and create your own.
 
 ==== Installing other Python versions
 
@@ -2094,7 +2115,7 @@ can compile wheels and add-in modules):
 root@foobaz:~# apt-get install python3.10 python3.10-dev
 ....
 
-This will install Python 3.8 as a new version of Python, but will not remove
+This will install Python 3.10 as a new version of Python, but will not remove
 any other existing versions installed on the system.
 
 Once you've installed a different version of Python, in order to use it with
@@ -2113,7 +2134,7 @@ root@foobaz:~# ln -s uwsgi3.10 /usr/local/bin/uwsgi
 ....
 
 This will replace `uwsgi` on the system with a version linked against Python
-3.8. You will need to restart the `uwsgi` service with `systemctl restart uwsgi`
+3.10. You will need to restart the `uwsgi` service with `systemctl restart uwsgi`
 to run the new version.
 
 If you need to double-check which version of Python a particular `uwsgi` binary
@@ -2125,14 +2146,14 @@ root@foobaz:~# ldd $(which uwsgi) | grep python
         libpython3.8.so.1.0 => /lib/x86_64-linux-gnu/libpython3.8.so.1.0 (0x00007fffee400000) <1>
 ....
 <1> We can see here that the binary is linked against `libpython3.8.so.1.`,
-    which belongs to Python 3.8 (in this case, the system Python).
+    which belongs to Python 3.8.
 
 You can read more about using uwsgi to run Python web applications such as Flask
 or Django in the section <<python-uwsgi>>.
 
 === Using Visual Studio `code-server`
 
-The `webproject` image as of version 3.1.0 contains built-in support for
+The `webproject` image as of 2024 contains built-in support for
 using the web-hosted version of Visual Studio Code (`code-server`) for editing
 your website and code.
 
@@ -2184,7 +2205,7 @@ image::vscode-zone.png[Screenshot,600]
 == Setting up specific types of applications on "webproject" [[webproject-frameworks]]
 
 TIP: This section is specifically for users of zones based on the `webproject`
-     image (version 3.0.0 or later).
+     image (2025 or later).
 
 === Static HTML (and JavaScript)
 
@@ -2430,73 +2451,7 @@ auth_require();
 print_r(auth_get_payload());
 ....
 
-The functions available in `uq/auth.php` are as follows:
-
-==== `+auth_require()+`
-
-Description:: If there is no current SSO session, this redirects the user to
-          force them to log in. If there is a current session, asserts
-          that the session is valid and then returns.
-
-Arguments:: none
-
-Return value:: none
-
-==== `+auth_get_payload()+`
-
-Description:: If there is no current SSO session, this retrieves the information
-          available about the user and returns it as an associative array.
-
-Arguments:: none
-
-Return value:: `array($string => $string)`: the authentication payload; or
-          `false`: no current SSO session or session valid.
-
-==== `+auth_is_member($group)+`
-
-Description:: Tests whether a user is logged in via SSO and they are a member
-          of the given group.
-
-Arguments::
- * `$group` -- a string, in the `domain:group` form
-
-Return value:: `true`: if the user is logged in and belongs to the group;
-           `false`: otherwise.
-
-==== `+auth_require_member($group)+`
-
-Description:: If there is no current SSO session, this redirects the user to
-          force them to log in. If there is a current session, checks
-          that the user is a member of the given group. If they are not,
-          serves a 403 error.
-
-Arguments::
- * `$group` -- a string, in the `domain:group` form
-
-Return value:: none
-
-==== `+auth_is_user($user)+`
-
-Description:: Tests whether a user is logged in via SSO and has the login name
-          given.
-
-Arguments::
- * `$user` -- a string, login name
-
-Return value:: `true`: if the user is logged in and their login name is `$user`;
-           `false`: otherwise.
-
-==== `+auth_require_user($user)+`
-
-Description:: If there is no current SSO session, this redirects the user to
-          force them to log in. If there is a current session, checks
-          that the user's login name matches the given argument. If it does
-          not, serves a 403 error.
-
-Arguments::
- * `$user` -- a string, login name
-
-Return value:: none
+The functions available in `uq/auth.php` are listed in <<PHP UQ library reference>>.
 
 ==== More complex PHP applications
 
@@ -2599,26 +2554,27 @@ client in the file `/var/log/uwsgi/error.log`. This includes stack traces from
 Python when requests unexpectedly throw an error, so you should check here first
 if things aren't working.
 
-==== Using a `virtualenv` environment
+==== Using Flask
 
-For our next example, we will set up a `virtualenv` environment and install
-{uri-flask}[Flask], a simple microframework which doesn't require many
-dependencies.
+For our next example, we will install {uri-flask}[Flask], a simple
+microframework which doesn't require many dependencies.
 
-First, we set up the environment:
-
-[source,shell-session]
-....
-root@foobar:~# cd /var/www/uwsgi
-root@foobar:/var/www/uwsgi# python3.8 -m venv ./
-....
-
-And then activate the new environment and install Flask:
+First, we activate the environment:
 
 [source,shell-session]
 ....
-root@foobaz:/var/www/uwsgi# . ./bin/activate
-(uwsgi)root@foobaz:/var/www/uwsgi# python -m pip install flask <1>
+uqxyz@foobar:~$ . /var/www/uwsgi/env/bin/activate
+(uwsgi) uqxyz@foobaz:~$
+....
+
+Note that we do not need to run these commands as `root` (since all of
+`/var/www` is writeable by our normal UQ user).
+
+And then install Flask:
+
+[source,shell-session]
+....
+(uwsgi) uqxyz@foobaz:/var/www/uwsgi# python -m pip install flask <1>
 Collecting flask
   Downloading Flask-1.1.1-py2.py3-none-any.whl (94 kB)
      |████████████████████████████████| 94 kB 4.7 MB/s
@@ -2669,14 +2625,12 @@ In `/etc/uwsgi/uwsgi.ini` we will need the following configuration:
 [source,ini]
 ....
 [uwsgi]
+...
 module = app2:app
-chdir = /var/www/uwsgi
-virtualenv = /var/www/uwsgi
-workers = 4
+...
 ....
 
-Note the addition of the new `virtualenv =` setting, as well as using
-`app2:app` as the module (rather than `myapp`). This is needed since we named
+We use `app2:app` as the module (rather than `myapp`), since we named
 the variable `app` which contains the `Flask()` instance above.
 
 After restarting `uwsgi` with `systemctl restart uwsgi`, you should see the new
@@ -2756,23 +2710,19 @@ TIP: `nginx` will ensure that the `X-KVD-Payload` header (and other SSO
 
 ==== Setting up Django
 
-For Django, we will set up a `virtualenv` environment as we did in the
-previous section.
-
-First, we set up the environment:
+For Django, we will activate our environment as we did in the previous section.
 
 [source,shell-session]
 ....
-root@foobar:~# cd /var/www/uwsgi
-root@foobar:/var/www/uwsgi# python3.8 -m venv .
+uqxyz@foobar:~$ . /var/www/uwsgi/env/bin/activate
+(uwsgi) uqxyz@foobaz:~$
 ....
 
 And then activate the new environment and install Django:
 
 [source,shell-session]
 ....
-root@foobaz:/var/www/uwsgi# . ./bin/activate
-(uwsgi)root@foobaz:/var/www/uwsgi# python -m pip install django
+(uwsgi) uqxyz@foobaz:/var/www/uwsgi$ python -m pip install django
 Collecting django
   Downloading Django-3.0.3-py3-none-any.whl (7.5 MB)
      |████████████████████████████████| 7.5 MB 22.9 MB/s
@@ -2787,13 +2737,13 @@ Installing collected packages: pytz, sqlparse, asgiref, django
 Successfully installed asgiref-3.2.3 django-3.0.3 pytz-2019.3 sqlparse-0.3.0
 ....
 
-Now, to create our Django project, we will use the `django-admin startproject`
+Now, to create our Django project, we will use `django-admin startproject`
 command:
 
 [source,shell-session]
 ....
-(uwsgi)root@foobaz:/var/www/uwsgi# django-admin startproject app
-(uwsgi)root@foobaz:/var/www/uwsgi# ls -la app
+(uwsgi) uqxyz@foobaz:/var/www/uwsgi$ django-admin startproject app
+(uwsgi) uqxyz@foobaz:/var/www/uwsgi$ ls -la app
 drwxr-xr-x 3 root root   4 Feb 11 04:37 .
 drwxr-xr-x 7 root root   7 Feb 11 04:35 ..
 drwxr-xr-x 3 root root   8 Feb 11 04:38 app
@@ -2807,7 +2757,7 @@ In `/etc/uwsgi/uwsgi.ini` we will need the following configuration:
 [uwsgi]
 module = app.wsgi:application
 chdir = /var/www/uwsgi/app
-virtualenv = /var/www/uwsgi
+virtualenv = /var/www/uwsgi/env
 env = DJANGO_SETTINGS_MODULE=app.settings
 workers = 4
 ....
@@ -2897,7 +2847,7 @@ in order to get access to new features. See the section
 <<Python versions and uwsgi>> for more details on managing multiple Python
 versions on your zone.
 
-=== Node.js with MongoDB
+=== Node.js
 
 Node.js applications generally run as an HTTP server on `localhost` on a
 particular port (commonly port `3000`).
@@ -2954,96 +2904,6 @@ You can use any other framework you like (not just Express), or even no
 framework at all (using the {uri-node-http}[standard library HTTP module]), as
 long as it meets these requirements.
 
-==== Using MongoDB
-
-Let's extend the simple example above to talk to MongoDB. First, we will need
-to enable MongoDB itself:
-
-[source,shell-session]
-....
-root@foobar:~# webprojctl enable mongodb
-== enabling mongodb...
-Enabling systemd unit mongodb
-Synchronizing state of mongodb.service with SysV init with /lib/systemd/systemd-sysv-install...
-Executing /lib/systemd/systemd-sysv-install enable mongodb
-....
-
-Now, we will install the client into our project with `npm`:
-
-[source,shell-session]
-....
-root@foobar:~# cd /var/www/nodejs
-root@foobar:/var/www/nodejs# npm install --save mongodb
-nodejs@1.0.0 /var/www/nodejs
-└─┬ mongodb@3.5.2
-  ├─┬ bl@2.2.0
-  │ └─┬ readable-stream@2.3.7
-  │   ├── core-util-is@1.0.2
-  │   ├── isarray@1.0.0
-  │   ├── process-nextick-args@2.0.1
-  │   ├── string_decoder@1.1.1
-  │   └── util-deprecate@1.0.2
-  ├── bson@1.1.3
-  ├── denque@1.4.1
-  ├─┬ require_optional@1.0.1
-  │ ├── resolve-from@2.0.0
-  │ └── semver@5.7.1
-  └─┬ saslprep@1.0.3
-    └─┬ sparse-bitfield@3.0.3
-      └── memory-pager@1.5.0
-....
-
-Then we will adjust the code in `app.js`:
-
-[source,javascript]
-....
-const express = require('express');
-const app = express();
-
-const MongoClient = require('mongodb').MongoClient;
-
-const port = 8081;
-
-const mongoUrl = 'mongodb://localhost:27017';
-const dbName = 'test';
-
-app.set('trust proxy', 'loopback');
-
-app.get('/', async function (req, res) {
-        const client = new MongoClient(mongoUrl);
-        await client.connect();
-        const adminDb = client.db(dbName).admin();
-
-        const dbInfo = await adminDb.listDatabases();
-        var html = '<table>';
-        html += '<tr><th>Name</th><th>Size</th></tr>';
-        for (const db of dbInfo.databases) {
-                html += '<tr>';
-                html += '<td>' + db.name + '</td>';
-                html += '<td>' + db.sizeOnDisk + '</td>';
-                html += '</tr>';
-
-        }
-        res.send(html);
-
-})
-
-app.listen(port, () => console.log(`Example app listening on port ${port}!`))
-....
-
-And finally, restart the application by using `systemctl restart`:
-
-[source,shell-session]
-....
-root@foobar:~# systemctl restart nodejs
-....
-
-If you visit your zone's website now you should see a table listing all of
-the databases within the MongoDB system (`admin`, `config`, and `local`).
-
-The {uri-mongo-js}[MongoDB JavaScript driver documentation] has many more
-details about how to use MongoDB in JavaScript code effectively.
-
 ==== Accessing SSO information
 
 The best way to access SSO information from Node.js is by unpacking the
@@ -3072,9 +2932,68 @@ This will display the message "Hello uqfoo" (if your UQ username was `uqfoo`),
 when placed behind any `nginx` SSO ACL which requires a user to be logged in.
 
 === Ruby/Puma (Sinatra, Rails)
+
 === ASP.net
+
 === Tomcat and JSP (Java)
 
+
+== Getting around the "jupyter" image
+
+TIP: This section is specifically for users of zones based on the `jupyter`
+     image (2025 or later).
+
+The `jupyter` image is designed to provide easy access to a
+{uri-jupyter}[Jupyter] notebook server. You can create a `jupyter` zone and
+access it in your web browser and have immediate access to a Jupyter or
+JupyterLab installation with:
+
+ * Python 3.12, with many common data science and machine learning libraries
+   already installed, including:
+    - matplotlib
+    - NumPy, SciPy
+    - pandas
+    - gmpy
+    - PyTorch
+    - Tensorflow
+    - And many more...
+ * R v4.4, with many common libraries already installed including:
+    - All of the CRAN "recommended" suite
+    - tidyverse
+    - dplyr
+    - ggplot2
+    - glmnet
+    - shiny
+    - tinymodels
+    - And many more...
+
+The image is based on `webproject`, so many of the details in the section
+for that image also apply for more advanced users. However, the intention of
+the `jupyter` image is to use it as a Jupyter notebook without having to
+look "under the hood".
+
+=== Creating a Jupyter notebook zone
+
+[source,shell-session]
+....
+$ triton inst create --wait jupyter z1-standard
+Creating instance 3a6ae279 (3a6ae279-30f6-4ad6-bc0c-48b1f345ac6d, jupyter@20250225)
+Created instance 3a6ae279 (3a6ae279-30f6-4ad6-bc0c-48b1f345ac6d) in 1m1s
+....
+
+Then open https://3a6ae279.uqcloud.net in a web browser.
+
+=== Changing between Jupyter Notebook (classic) and JupyterLab
+
+=== Installing Python packages
+
+Open a Jupyter terminal and use `pip install`. Don't use `sudo`.
+
+=== Installing R packages
+
+Install from CRAN with `apt-get`, the PPA is added to the image.
+
+=== Metadata
 
 
 == Setting up web applications from scratch
@@ -3342,10 +3261,10 @@ applications by directing users to a website which then captures the
 authentication information and stores it.
 
 In the `webproject` image and other images which are based on it, the `nginx`
-service handles all of the mechanics of validating SSO sessions and retrieving
-information about the user. For web applications running behind a `webproject`
-`nginx` server, the user information is available in a number of special HTTP
-headers.
+service and `webacld` handle the mechanics of validating SSO sessions and
+retrieving information about the user. For web applications running behind a
+`webproject` `nginx` server, the user information is available in a number
+of special HTTP headers.
 
 For other types of zones, interaction with the SSO system may have to be
 handled in your application itself. For detailed technical information about
@@ -4562,6 +4481,74 @@ progress updates, and you can ask questions about ongoing issues.
 
 
 [appendix]
+== PHP UQ library reference
+
+=== `+auth_require()+`
+
+Description:: If there is no current SSO session, this redirects the user to
+          force them to log in. If there is a current session, asserts
+          that the session is valid and then returns.
+
+Arguments:: none
+
+Return value:: none
+
+=== `+auth_get_payload()+`
+
+Description:: If there is no current SSO session, this retrieves the information
+          available about the user and returns it as an associative array.
+
+Arguments:: none
+
+Return value:: `array($string => $string)`: the authentication payload; or
+          `false`: no current SSO session or session valid.
+
+=== `+auth_is_member($group)+`
+
+Description:: Tests whether a user is logged in via SSO and they are a member
+          of the given group.
+
+Arguments::
+ * `$group` -- a string, in the `domain:group` form
+
+Return value:: `true`: if the user is logged in and belongs to the group;
+           `false`: otherwise.
+
+=== `+auth_require_member($group)+`
+
+Description:: If there is no current SSO session, this redirects the user to
+          force them to log in. If there is a current session, checks
+          that the user is a member of the given group. If they are not,
+          serves a 403 error.
+
+Arguments::
+ * `$group` -- a string, in the `domain:group` form
+
+Return value:: none
+
+=== `+auth_is_user($user)+`
+
+Description:: Tests whether a user is logged in via SSO and has the login name
+          given.
+
+Arguments::
+ * `$user` -- a string, login name
+
+Return value:: `true`: if the user is logged in and their login name is `$user`;
+           `false`: otherwise.
+
+=== `+auth_require_user($user)+`
+
+Description:: If there is no current SSO session, this redirects the user to
+          force them to log in. If there is a current session, checks
+          that the user's login name matches the given argument. If it does
+          not, serves a 403 error.
+
+Arguments::
+ * `$user` -- a string, login name
+
+Return value:: none
+
 == Fabric networks, public IP addresses and high availability [[fabrics]]
 
 === Network and application design
