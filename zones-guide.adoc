@@ -2972,20 +2972,34 @@ look "under the hood".
 
 === Creating a Jupyter notebook zone
 
-You can create a new Jupyter notebook zone by simply requesting the image
-named `jupyter` for a new zone:
+You can create a new Jupyter notebook zone on your personal account by simply
+requesting the image named `jupyter` for a new zone:
 
 [source,shell-session]
 ....
 $ triton inst create --wait jupyter z1-standard
-Creating instance xxxxxxxx (3a6ae279-30f6-4ad6-bc0c-48b1f345ac6d, jupyter@20250225)
-Created instance xxxxxxxx (3a6ae279-30f6-4ad6-bc0c-48b1f345ac6d) in 1m1s <1>
+Creating instance xxxxxxxx (.., jupyter@20250225)
+Created instance xxxxxxxx (..) in 1m1s <1>
 ....
 <1> "Created instance `xxxxxxxx`" shows the new name of the zone, which you
     can use to access it.
 
 Then open https://xxxxxxxx.uqcloud.net in a web browser (replacing the X
 string with the name of your zone from the output above).
+
+If you're creating a Jupyter zone on a group account or one you want to use
+to collaborate with others, you will need to set metadata keys to let the
+image know which user "owns" the zone (the Jupyter notebooks will run as
+this user) and any other UQ users who are allowed:
+
+[source,shell-session]
+....
+$ triton inst create --wait \
+  -m owner=uqxyz -m uq_users=s4xxxxx \
+  jupyter z1-standard
+Creating instance xxxxxxxx (.., jupyter@20250225)
+Created instance xxxxxxxx (..) in 1m1s <1>
+....
 
 === Changing between Jupyter Notebook (classic) and JupyterLab
 
