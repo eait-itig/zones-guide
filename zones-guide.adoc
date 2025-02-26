@@ -640,7 +640,7 @@ TIP: Metadata keys which are optional for a given image can generally be
 | List of UQ usernames separated by spaces | `uqfoobar uqxyz`
 |===
 
-==== `jupyter` image
+==== `jupyter` image [[jupyter-mdata]]
 
 [options="header"]
 |===
@@ -660,14 +660,12 @@ TIP: Metadata keys which are optional for a given image can generally be
 
 |===
 
-See also <<webproj-mdata>> above. Note that the `owner` user must be repeated
-in the `uq_users` metadata, so a typical invocation will look like:
+See also <<webproj-mdata>> above. A typical invocation will look like:
 
 [source,shell-session]
 ....
 $ triton inst create \
     --metadata owner=uqfoobar \
-    --metadata uq_users=uqfoobar \
     jupyter ...
 ....
 
@@ -2974,26 +2972,97 @@ look "under the hood".
 
 === Creating a Jupyter notebook zone
 
+You can create a new Jupyter notebook zone by simply requesting the image
+named `jupyter` for a new zone:
+
 [source,shell-session]
 ....
 $ triton inst create --wait jupyter z1-standard
-Creating instance 3a6ae279 (3a6ae279-30f6-4ad6-bc0c-48b1f345ac6d, jupyter@20250225)
-Created instance 3a6ae279 (3a6ae279-30f6-4ad6-bc0c-48b1f345ac6d) in 1m1s
+Creating instance xxxxxxxx (3a6ae279-30f6-4ad6-bc0c-48b1f345ac6d, jupyter@20250225)
+Created instance xxxxxxxx (3a6ae279-30f6-4ad6-bc0c-48b1f345ac6d) in 1m1s <1>
 ....
+<1> "Created instance `xxxxxxxx`" shows the new name of the zone, which you
+    can use to access it.
 
-Then open https://3a6ae279.uqcloud.net in a web browser.
+Then open https://xxxxxxxx.uqcloud.net in a web browser (replacing the X
+string with the name of your zone from the output above).
 
 === Changing between Jupyter Notebook (classic) and JupyterLab
 
+By default, the Jupyter image will start a JupyterLab notebook. You can change
+it back to the classic Jupyter Notebook if you wish by either:
+
+ * Setting the `jupyter_lab` metadata key when you create the zone (see
+   <<jupyter-mdata>>)
+ * Opening a terminal on the zone and using `systemctl` to swap the
+   `juptyerlab@` and `jupyter@` services around
+
+For the second option, assuming your username is `uqxyz`, and you wanted
+to change from JupyterLab to the classic notebook, you would run:
+
+[source,shell-session]
+....
+$ sudo systemctl disable --now jupyterlab@uqxyz
+$ sudo systemctl enable --now jupyter@uqxyz
+....
+
 === Installing Python packages
 
-Open a Jupyter terminal and use `pip install`. Don't use `sudo`.
+A lot of commonly used Python packages are pre-installed in the image and we
+advise that you simply try `import` on them first before trying to install them.
+
+If you do need to install a package that's missing, you can either:
+
+ * Open a terminal and use `pip install` (_without_ `sudo`)
+ * Use a `!pip install` cell in your notebook
+
+The Jupyter installation is set up in a Python virtual environment (`venv`)
+in the `/opt/jupyter` directory. This environment is automatically activated
+for normal user sessions on the zone, and it is writeable by any member of
+`sysadmin`. However, it is not activated for logins or sessions as `root`,
+including with `sudo`, so you should **not** try to use `sudo pip install`
+on a Jupyter zone.
 
 === Installing R packages
 
-Install from CRAN with `apt-get`, the PPA is added to the image.
+The installation of R in the Jupyter image is managed by the system package
+manager (`apt` / `apt-get`). The CRAN PPA has been added to the image so that
+R packages can be installed via this method.
 
-=== Metadata
+To find the correct name for a given R package, use `apt-cache search` and then
+`apt-get install` to install it:
+
+[source,shell-session]
+....
+(jupyter) uqxyz@jupyter:~$ apt-cache search yamlet
+r-cran-yamlet - CRAN Package 'yamlet' (Versatile Curation of Table Metadata)
+
+(jupyter) uqxyz@jupyter:~$ sudo apt-get install r-cran-yamlet
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages were automatically installed and are no longer required:
+  libgit2-1.7 libhttp-parser2.9 libllvm17t64 libssh2-1t64 libstd-rust-1.75
+  libstd-rust-dev
+Use 'sudo apt autoremove' to remove them.
+The following additional packages will be installed:
+  libudunits2-0 libudunits2-data r-cran-csv r-cran-encode r-cran-kableextra
+  r-cran-latexpdf r-cran-spork r-cran-units
+Suggested packages:
+  r-cran-table1 r-cran-tablet
+The following NEW packages will be installed:
+  libudunits2-0 libudunits2-data r-cran-csv r-cran-encode r-cran-kableextra
+  r-cran-latexpdf r-cran-spork r-cran-units r-cran-yamlet
+0 upgraded, 9 newly installed, 0 to remove and 2 not upgraded.
+Need to get 3,567 kB of archives.
+After this operation, 5,871 kB of additional disk space will be used.
+Do you want to continue? [Y/n] Y
+...
+....
+
+After you've done this, the package will be available in new R sessions and
+notebooks.
+
 
 
 == Setting up web applications from scratch
