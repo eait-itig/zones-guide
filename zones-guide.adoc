@@ -1539,7 +1539,7 @@ We can see which frameworks are enabled by running the command
 ....
 root@foobar:~# webprojctl status
 enabled:
-available: php, uwsgi312, uwsgi314 (python), nodejs, puma (ruby / rails), jsp, tomcat (jsp / java), dotnet, mysql, postgres, redis, vscode
+available: php, uwsgi312, uwsgi314 (python), nodejs, puma (ruby / rails), jsp, tomcat (jsp / java), dotnet, mysql, postgres, redis, vscode, mongodb
 ....
 
 To enable or disable one of the frameworks, we can use the commands
@@ -2845,7 +2845,7 @@ in order to get access to new features. See the section
 <<Python versions and uwsgi>> for more details on managing multiple Python
 versions on your zone.
 
-=== Node.js
+=== Node.js with MongoDB
 
 Node.js applications generally run as an HTTP server on `localhost` on a
 particular port (commonly port `3000`).
@@ -2901,6 +2901,96 @@ a file named `app.js` exists and can be run with Node, and it listens on port
 You can use any other framework you like (not just Express), or even no
 framework at all (using the {uri-node-http}[standard library HTTP module]), as
 long as it meets these requirements.
+
+==== Using MongoDB
+
+Let's extend the simple example above to talk to MongoDB. First, we will need
+to enable MongoDB itself:
+
+[source,shell-session]
+....
+root@foobar:~# webprojctl enable mongodb
+== enabling mongodb...
+Enabling systemd unit mongodb
+Synchronizing state of mongodb.service with SysV init with /lib/systemd/systemd-sysv-install...
+Executing /lib/systemd/systemd-sysv-install enable mongodb
+....
+
+Now, we will install the client into our project with `npm`:
+
+[source,shell-session]
+....
+root@foobar:~# cd /var/www/nodejs
+root@foobar:/var/www/nodejs# npm install --save mongodb
+nodejs@1.0.0 /var/www/nodejs
+└─┬ mongodb@3.5.2
+  ├─┬ bl@2.2.0
+  │ └─┬ readable-stream@2.3.7
+  │   ├── core-util-is@1.0.2
+  │   ├── isarray@1.0.0
+  │   ├── process-nextick-args@2.0.1
+  │   ├── string_decoder@1.1.1
+  │   └── util-deprecate@1.0.2
+  ├── bson@1.1.3
+  ├── denque@1.4.1
+  ├─┬ require_optional@1.0.1
+  │ ├── resolve-from@2.0.0
+  │ └── semver@5.7.1
+  └─┬ saslprep@1.0.3
+    └─┬ sparse-bitfield@3.0.3
+      └── memory-pager@1.5.0
+....
+
+Then we will adjust the code in `app.js`:
+
+[source,javascript]
+....
+const express = require('express');
+const app = express();
+
+const MongoClient = require('mongodb').MongoClient;
+
+const port = 8081;
+
+const mongoUrl = 'mongodb://localhost:27017';
+const dbName = 'test';
+
+app.set('trust proxy', 'loopback');
+
+app.get('/', async function (req, res) {
+        const client = new MongoClient(mongoUrl);
+        await client.connect();
+        const adminDb = client.db(dbName).admin();
+
+        const dbInfo = await adminDb.listDatabases();
+        var html = '<table>';
+        html += '<tr><th>Name</th><th>Size</th></tr>';
+        for (const db of dbInfo.databases) {
+                html += '<tr>';
+                html += '<td>' + db.name + '</td>';
+                html += '<td>' + db.sizeOnDisk + '</td>';
+                html += '</tr>';
+
+        }
+        res.send(html);
+
+})
+
+app.listen(port, () => console.log(`Example app listening on port ${port}!`))
+....
+
+And finally, restart the application by using `systemctl restart`:
+
+[source,shell-session]
+....
+root@foobar:~# systemctl restart nodejs
+....
+
+If you visit your zone's website now you should see a table listing all of
+the databases within the MongoDB system (`admin`, `config`, and `local`).
+
+The {uri-mongo-js}[MongoDB JavaScript driver documentation] has many more
+details about how to use MongoDB in JavaScript code effectively.
 
 ==== Accessing SSO information
 
