@@ -40,7 +40,7 @@
 :uri-jupyter: https://jupyter.org/
 
 = UQcloud zones guide
-:author: Alex Wilson (EAIT ITIG)
+:author: Lexi Wilson (EAIT ITIG)
 :email: helpdesk@eait.uq.edu.au
 
 == Introduction
